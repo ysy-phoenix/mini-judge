@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+redis
+pydantic
+pydantic-settings
+python-multipart
+pytest
+pytest-asyncio
+httpx
+rich
+psutil
+ruff
+pre-commit
