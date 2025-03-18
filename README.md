@@ -1,4 +1,4 @@
-# 🧑‍⚖️ Mini-Judge
+# 🌟 Mini-Judge
 <p align="center">
 <a href="https://github.com/yourusername/mini-judge"><img src="https://img.shields.io/badge/Mini-Judge-blue.svg"></a>
 <a href="https://github.com/yourusername/mini-judge/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
@@ -19,7 +19,7 @@
 Mini-Judge is a lightweight, high-performance online judge system for evaluating code solutions, supporting multiple programming languages and evaluation modes.
 
 > [!Warning]
-> Just a toy project.
+> Simple and naive implementation, without security guarantees.
 
 ## 📦 Installation
 
@@ -54,18 +54,10 @@ Start the server
 uvicorn app.main:app --reload
 ```
 
-Submit a code for evaluation
+Stress test (512 samples, expected completion time: 1 minute)
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/judge \
-  -H "Content-Type: application/json" \
-  -d '{"code": "print('Hello, World!')", "language": "python"}'
-```
-
-Check results
-
-```bash
-curl http://localhost:8000/api/v1/judge/{task_id}
+python scripts/taco.py
 ```
 
 ## 🛠 Development
@@ -98,7 +90,8 @@ pre-commit run --all-files
 
 ## 🛣 Roadmap
 
-- [ ] high concurrency
+- [x] high concurrency (maybe)
+- [ ] support LeetCode Mode
 
 ## 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.

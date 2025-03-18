@@ -7,9 +7,11 @@ from app.core.config import settings
 from app.utils.logger import logger
 from app.workers.judge_worker import JudgeWorker
 
+INTERVAL = 120
+
 
 class WorkerManager:
-    """Manages a pool of worker processes"""
+    r"""Manages a pool of worker processes."""
 
     def __init__(self):
         self.workers: list[JudgeWorker] = []
@@ -17,7 +19,6 @@ class WorkerManager:
 
         # Start workers
         max_workers = settings.MAX_WORKERS
-        logger.info(f"Starting {max_workers} judge workers...")
 
         for i in range(max_workers):
             worker = JudgeWorker(i)
@@ -33,7 +34,7 @@ class WorkerManager:
         self._monitor_thread.start()
 
     def _monitor_workers(self):
-        """Monitor worker processes and restart if needed"""
+        r"""Monitor worker processes and restart if needed."""
         while self.running:
             failed_workers = 0
             busy_workers = 0
@@ -86,7 +87,7 @@ class WorkerManager:
             )
 
             # Sleep before next check
-            time.sleep(30)
+            time.sleep(INTERVAL)
 
     def shutdown(self):
         """Shutdown all workers"""

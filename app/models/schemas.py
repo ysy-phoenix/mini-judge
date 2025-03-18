@@ -1,3 +1,4 @@
+import uuid
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -31,13 +32,18 @@ class JudgeTestCase(BaseModel):
     expected: str
 
 
-class JudgeRequest(BaseModel):
+class Submission(BaseModel):
     code: str = Field(..., description="Source code to be judged")
     language: Language
     mode: JudgeMode
     test_cases: list[JudgeTestCase]
     time_limit: int | None = 1  # seconds
     memory_limit: int | None = 256  # MB
+    task_id: str | None = None
+
+    def __post_init__(self):
+        if self.task_id is None:
+            self.task_id = str(uuid.uuid4())
 
 
 class TestCaseResult(BaseModel):
@@ -49,10 +55,10 @@ class TestCaseResult(BaseModel):
     actual_output: str | None = None
 
 
-class JudgeResponse(BaseModel):
+class JudgeResult(BaseModel):
     status: JudgeStatus
     execution_time: float | None = None  # ms
     memory_usage: int | None = None  # KB
     error_message: str | None = None
     test_case_results: list[TestCaseResult] | None = None
-    task_id: str | None = None  # for async tasks
+    task_id: str | None = None

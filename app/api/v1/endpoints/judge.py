@@ -2,49 +2,30 @@ import uuid
 
 from fastapi import APIRouter, HTTPException
 
-from app.models.schemas import JudgeRequest, JudgeResponse, JudgeStatus
-from app.services.judge import process_judge_task_direct
-from app.utils.logger import log_with_context
-from app.utils.redis import add_to_queue, get_result, get_task, set_task
+from app.core.config import settings
+from app.models.schemas import JudgeResult, Submission
+from app.utils.logger import logger
+from app.utils.redis import get_redis
 
 router = APIRouter()
 
+MAX_WAIT_TIME = 60  # seconds
 
-@router.post("", response_model=JudgeResponse)
-async def create_judge_task(request: JudgeRequest) -> JudgeResponse:
-    """Submit code for judging and wait for the result"""
+
+@router.post("", response_model=JudgeResult)
+async def create_judge_task(submission: Submission) -> JudgeResult:
+    """Submit code for judging and wait for the result (using worker pool)"""
     try:
-        result = await process_judge_task_direct(request)
-        return result
+        if submission.task_id is None:
+            submission.task_id = str(uuid.uuid4())
+        redis = await get_redis()
+        await redis.rpush(f"{settings.REDIS_SUBMISSION_QUEUE}", submission.model_dump_json())
+        _, result = await redis.blpop(
+            f"{settings.REDIS_RESULT_QUEUE}:{submission.task_id}", timeout=MAX_WAIT_TIME
+        )
+        await redis.delete(f"{settings.REDIS_RESULT_QUEUE}:{submission.task_id}")
+        return JudgeResult.model_validate_json(result)
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.post("/async", response_model=JudgeResponse)
-async def create_async_judge_task(request: JudgeRequest) -> JudgeResponse:
-    """Submit code for judging asynchronously"""
-    try:
-        task_id = str(uuid.uuid4())
-        await set_task(task_id, request.model_dump())
-        await add_to_queue("judge_tasks", task_id)
-        log_with_context("Task queued for async processing", {"task_id": task_id})
-        return JudgeResponse(status=JudgeStatus.PENDING, task_id=task_id)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-
-
-@router.get("/{task_id}", response_model=JudgeResponse)
-async def get_judge_result(task_id: str) -> JudgeResponse:
-    """Get the result of the judging task"""
-    try:
-        result_data = await get_result(task_id)
-        if result_data:
-            return JudgeResponse(**result_data)
-        task_data = await get_task(task_id)
-        if not task_data:
-            raise HTTPException(status_code=404, detail=f"Task with ID {task_id} not found")
-        return JudgeResponse(status=JudgeStatus.PENDING, task_id=task_id)
-    except HTTPException:
-        raise
-    except Exception as e:
+        logger.error(f"Error processing judge task: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from e

@@ -5,30 +5,30 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
-from app.utils.logger import log_with_context
+from app.utils.logger import logger
 from app.utils.redis import close_redis, get_redis
 from app.workers.manager import WorkerManager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    log_with_context("Application starting", {"version": settings.VERSION})
+    logger.info("Application starting", {"version": settings.VERSION})
 
     # Initialize Redis on startup
     await get_redis()
-    log_with_context(
+    logger.info(
         "Redis connection established", {"host": settings.REDIS_HOST, "port": settings.REDIS_PORT}
     )
 
     worker_manager = WorkerManager()
     yield
 
-    log_with_context("Application shutting down")
+    logger.info("Application shutting down")
 
     worker_manager.shutdown()
 
     await close_redis()
-    log_with_context("Redis connection closed")
+    logger.info("Redis connection closed")
 
 
 app = FastAPI(
@@ -54,5 +54,5 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/health")
 async def health_check():
-    log_with_context("Health check")
+    logger.info("Health check")
     return {"status": "healthy"}

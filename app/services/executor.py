@@ -6,7 +6,7 @@ import psutil
 
 from app.core.config import settings
 from app.models.schemas import JudgeMode, JudgeStatus, JudgeTestCase, Language
-from app.utils.logger import log_with_context
+from app.utils.logger import logger
 
 
 class ExecutionResult:
@@ -39,7 +39,7 @@ async def monitor_process_memory(pid: int, stop_event: asyncio.Event) -> int:
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 break
     except Exception as e:
-        log_with_context(f"Error monitoring memory: {str(e)}", {"pid": pid}, level="error")
+        logger.error(f"Error monitoring memory: {str(e)}")
     return max_memory
 
 
@@ -98,10 +98,10 @@ async def _execute_with_limits(
             preexec_fn=set_limits,
         )
 
-        pid = process.pid
+        # pid = process.pid
 
-        # Start memory monitoring in parallel
-        memory_task = asyncio.create_task(monitor_process_memory(pid, stop_event))
+        # Start memory monitoring in parallel FIXME: memory monitoring is dsiabled
+        # memory_task = asyncio.create_task(monitor_process_memory(pid, stop_event))
 
         # Set a timeout using asyncio
         try:
@@ -114,14 +114,7 @@ async def _execute_with_limits(
 
             # End memory monitoring and get result
             stop_event.set()
-            memory_usage = await memory_task
-
-            # If memory monitoring failed, try to get memory usage from resource module
-            if memory_usage == 0:
-                # rusage_children gives resource usage of all terminated child processes
-                rusage = resource.getrusage(resource.RUSAGE_CHILDREN)
-                # maxrss is in KB on most Unix systems
-                memory_usage = rusage.ru_maxrss
+            memory_usage = 0  # FIXME: memory monitoring is dsiabled
 
             stdout_str = stdout.decode("utf-8", errors="replace")
             stderr_str = stderr.decode("utf-8", errors="replace")
@@ -146,7 +139,7 @@ async def _execute_with_limits(
         except asyncio.TimeoutError:
             # Kill the process if it timed out
             stop_event.set()
-            memory_usage = await memory_task
+            memory_usage = 0  # FIXME: memory monitoring is dsiabled
 
             try:
                 process.kill()

@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     REDIS_PREFIX: str = "mini_judge:"
+    REDIS_SUBMISSION_QUEUE: str = f"{REDIS_PREFIX}queue:submissions"
+    REDIS_RESULT_QUEUE: str = f"{REDIS_PREFIX}queue:results"
 
     # Judge settings
     MAX_EXECUTION_TIME: int = 5  # seconds
