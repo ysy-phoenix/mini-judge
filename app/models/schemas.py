@@ -48,8 +48,8 @@ class Submission(BaseModel):
 
 class TestCaseResult(BaseModel):
     status: JudgeStatus
-    execution_time: float | None = None  # ms
-    memory_usage: int | None = None  # KB
+    execution_time: float | None = None  # seconds
+    memory_usage: int | None = None  # MB
     error_message: str | None = None
     expected_output: str | None = None
     actual_output: str | None = None
@@ -57,8 +57,8 @@ class TestCaseResult(BaseModel):
 
 class JudgeResult(BaseModel):
     status: JudgeStatus
-    execution_time: float | None = None  # ms
-    memory_usage: int | None = None  # KB
+    execution_time: float | None = None  # seconds
+    memory_usage: int | None = None  # MB
     error_message: str | None = None
     test_case_results: list[TestCaseResult] | None = None
     task_id: str | None = None

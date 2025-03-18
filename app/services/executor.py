@@ -19,8 +19,8 @@ class ExecutionResult:
         error: str = "",
     ):
         self.status = status
-        self.execution_time = execution_time  # in milliseconds
-        self.memory_usage = memory_usage  # in KB
+        self.execution_time = execution_time  # in seconds
+        self.memory_usage = memory_usage  # in MB
         self.output = output
         self.error = error
 
@@ -32,12 +32,14 @@ async def monitor_process_memory(pid: int, stop_event: asyncio.Event) -> int:
         process = psutil.Process(pid)
         while not stop_event.is_set():
             try:
-                # Get memory usage in KB (RSS - Resident Set Size)
-                memory = process.memory_info().rss // 1024
+                # Get memory usage in MB (RSS - Resident Set Size)
+                memory = process.memory_info().rss // 1024 // 1024
                 max_memory = max(max_memory, memory)
                 await asyncio.sleep(0.01)  # 10ms interval
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 break
+    except psutil.NoSuchProcess:
+        pass
     except Exception as e:
         logger.error(f"Error monitoring memory: {str(e)}")
     return max_memory
@@ -98,10 +100,8 @@ async def _execute_with_limits(
             preexec_fn=set_limits,
         )
 
-        # pid = process.pid
-
-        # Start memory monitoring in parallel FIXME: memory monitoring is dsiabled
-        # memory_task = asyncio.create_task(monitor_process_memory(pid, stop_event))
+        # Start memory monitoring in parallel FIXME: memory monitoring is enabled
+        memory_task = asyncio.create_task(monitor_process_memory(process.pid, stop_event))
 
         # Set a timeout using asyncio
         try:
@@ -110,11 +110,11 @@ async def _execute_with_limits(
                 timeout=time_limit_sec + 1,  # Give some extra time for process creation
             )
 
-            execution_time = (time.time() - start_time) * 1000  # Convert to ms
+            execution_time = time.time() - start_time  # seconds
 
             # End memory monitoring and get result
             stop_event.set()
-            memory_usage = 0  # FIXME: memory monitoring is dsiabled
+            memory_usage = await memory_task
 
             stdout_str = stdout.decode("utf-8", errors="replace")
             stderr_str = stderr.decode("utf-8", errors="replace")
@@ -139,7 +139,6 @@ async def _execute_with_limits(
         except asyncio.TimeoutError:
             # Kill the process if it timed out
             stop_event.set()
-            memory_usage = 0  # FIXME: memory monitoring is dsiabled
 
             try:
                 process.kill()
@@ -148,8 +147,8 @@ async def _execute_with_limits(
 
             return ExecutionResult(
                 status=JudgeStatus.TIME_LIMIT_EXCEEDED,
-                execution_time=time_limit_sec * 1000,  # We report the full time limit
-                memory_usage=memory_usage,
+                execution_time=time_limit_sec,  # We report the full time limit
+                memory_usage=0,
                 output="",
                 error="Time limit exceeded",
             )

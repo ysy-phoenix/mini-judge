@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from app.models.schemas import (
     JudgeResult,
@@ -74,7 +75,10 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
         ]
 
         # Wait for all test cases to be executed
+        start_time = time.time()
         execution_results = await asyncio.gather(*execution_tasks)
+        end_time = time.time()
+        execution_time = end_time - start_time
 
         # Process the execution results
         test_case_results = []
@@ -126,9 +130,10 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
 
         status_color = "green" if overall_status == JudgeStatus.ACCEPTED else "red"
         logger.info(
-            f"[cyan] Results of submission {submission.task_id.split('-')[0]}: [/cyan]"
-            f"[bold {status_color}]{overall_status.value}[/bold {status_color}]\t"
-            f"[magenta]Passed {passed_cases}/{len(submission.test_cases)} cases[/magenta]"
+            f"[cyan] Submission {submission.task_id.split('-')[0]}: [/cyan]"
+            f"[bold {status_color}]{overall_status.value}[/bold {status_color}] | "
+            f"[magenta]Passed {passed_cases}/{len(submission.test_cases)} cases[/magenta] | "
+            f"[yellow]Total time: {execution_time:.2f} seconds[/yellow]"
         )
 
         # Return final response

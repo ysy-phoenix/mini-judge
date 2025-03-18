@@ -1,11 +1,17 @@
 import json
 import math
 import re
+import time
+from collections import Counter
 from multiprocessing import Pool
+from statistics import mean, median
 
 import requests
 from datasets import load_dataset
-from tqdm import tqdm
+from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
 DEFAULT_TIME_LIMIT = 6
 DEFAULT_MEMORY_LIMIT = 1024
@@ -37,11 +43,18 @@ def extract_memory_limit(memory_limit: str | None) -> int:
 
 
 def judge(request: dict) -> dict:
+    start_time = time.time()
     response = requests.post(API_BASE_URL, json=request)
-    return response.json()
+    end_time = time.time()
+    result = response.json()
+    # Add request latency to the result
+    result["request_latency"] = (end_time - start_time) * 1000  # ms
+    return result
 
 
 def main():
+    console = Console()
+
     ds = load_dataset("likaixin/TACO-verified", split="train", trust_remote_code=True)
     max_samples = 512
 
@@ -75,20 +88,123 @@ def main():
         if len(requests_data) >= max_samples:
             break
 
+    benchmark_start = time.time()
     with Pool(512) as pool:
-        results = list(
-            tqdm(pool.imap(judge, requests_data), total=len(requests_data), desc="Processing")
+        results = pool.map(judge, requests_data)
+    benchmark_end = time.time()
+    total_time = benchmark_end - benchmark_start
+
+    print_stress_test_summary(results, total_time, max_samples, console)
+
+
+def print_stress_test_summary(results, total_time, total_samples, console):
+    r"""Generate and print a comprehensive stress test summary."""
+    # Status distribution
+    status_counts = Counter(result.get("status") for result in results)
+    accepted_count = status_counts.get("accepted", 0)
+    success_rate = (accepted_count / len(results)) * 100 if results else 0
+
+    # Performance metrics
+    latencies = [result.get("request_latency", 0) for result in results]
+    execution_times = [
+        result.get("execution_time", 0)
+        for result in results
+        if result.get("execution_time") is not None
+    ]
+    memory_usages = [
+        result.get("memory_usage", 0)
+        for result in results
+        if result.get("memory_usage") is not None
+    ]
+
+    # Calculate throughput
+    throughput = len(results) / total_time if total_time > 0 else 0
+
+    # Create summary table
+    summary_table = Table(title="Stress Test Summary", box=box.ROUNDED)
+    summary_table.add_column("Metric", style="bright_cyan")
+    summary_table.add_column("Value", style="bright_white")
+
+    summary_table.add_row("Total Samples", str(total_samples))
+    summary_table.add_row("Processed Samples", str(len(results)))
+    summary_table.add_row("Success Rate", f"{success_rate:.2f}%")
+    summary_table.add_row("Total Time", f"{total_time:.2f} seconds")
+    summary_table.add_row("Throughput", f"{throughput:.2f} requests/second")
+
+    if latencies:
+        summary_table.add_row("Avg Request Latency", f"{mean(latencies):.2f} ms")
+        summary_table.add_row("Median Request Latency", f"{median(latencies):.2f} ms")
+        summary_table.add_row(
+            "Min/Max Request Latency", f"{min(latencies):.2f}/{max(latencies):.2f} ms"
         )
 
-    for idx, (result, _problem, req) in enumerate(
-        zip(results, problems_data, requests_data, strict=False)
-    ):
-        if result.get("status") != "accepted":
-            print(f"Request {idx} failed:\n{result}")
-            # print(f"Problem {idx}:\n{problem}")
-            print(f"Code {idx}:\n{req.get('code')}")
-        # else:
-        #     print(f"Request {idx} passed\n{result}")
+    if execution_times:
+        summary_table.add_row("Avg Execution Time", f"{mean(execution_times):.2f} seconds")
+        summary_table.add_row("Median Execution Time", f"{median(execution_times):.2f} seconds")
+        summary_table.add_row(
+            "Min/Max Execution Time",
+            f"{min(execution_times):.2f}/{max(execution_times):.2f} seconds",
+        )
+
+    if memory_usages:
+        summary_table.add_row("Avg Memory Usage", f"{mean(memory_usages):.2f} MB")
+        summary_table.add_row("Median Memory Usage", f"{median(memory_usages):.2f} MB")
+        summary_table.add_row(
+            "Min/Max Memory Usage", f"{min(memory_usages):.2f}/{max(memory_usages):.2f} MB"
+        )
+
+    # Create status distribution table
+    status_table = Table(title="Status Distribution", box=box.ROUNDED)
+    status_table.add_column("Status", style="bright_cyan")
+    status_table.add_column("Count", style="bright_white")
+    status_table.add_column("Percentage", style="bright_white")
+
+    for status, count in sorted(status_counts.items()):
+        percentage = (count / len(results)) * 100 if results else 0
+        status_style = "bright_green" if status == "accepted" else "bright_red"
+        status_table.add_row(
+            f"[{status_style}]{status}[/{status_style}]", str(count), f"{percentage:.2f}%"
+        )
+
+    # Create performance percentiles table
+    if latencies:
+        perf_table = Table(title="Performance Percentiles", box=box.ROUNDED)
+        perf_table.add_column("Percentile", style="bright_cyan")
+        perf_table.add_column("Request Latency (seconds)", style="bright_white")
+        if execution_times:
+            perf_table.add_column("Execution Time (seconds)", style="bright_white")
+        if memory_usages:
+            perf_table.add_column("Memory Usage (MB)", style="bright_white")
+
+        sorted_latencies = sorted(latencies)
+        sorted_exec_times = sorted(execution_times) if execution_times else []
+        sorted_memory = sorted(memory_usages) if memory_usages else []
+
+        for p in [50, 75, 90, 95, 99]:
+            idx = int(len(sorted_latencies) * (p / 100))
+            lat_p = sorted_latencies[idx] if idx < len(sorted_latencies) else 0
+
+            row = [f"P{p}", f"{lat_p:.2f}"]
+
+            if execution_times:
+                idx = int(len(sorted_exec_times) * (p / 100))
+                exec_p = sorted_exec_times[idx] if idx < len(sorted_exec_times) else 0
+                row.append(f"{exec_p:.2f}")
+
+            if memory_usages:
+                idx = int(len(sorted_memory) * (p / 100))
+                mem_p = sorted_memory[idx] if idx < len(sorted_memory) else 0
+                row.append(f"{mem_p:.2f}")
+
+            perf_table.add_row(*row)
+
+    # Print all tables
+    console.print("\n")
+    console.print(Panel.fit("🚀 MINI-JUDGE BENCHMARK RESULTS 🚀", style="bright_green"))
+    console.print(summary_table)
+    console.print(status_table)
+    if latencies:
+        console.print(perf_table)
 
 
 if __name__ == "__main__":
