@@ -1,3 +1,5 @@
+import multiprocessing
+
 from pydantic_settings import BaseSettings
 
 
@@ -14,15 +16,20 @@ class Settings(BaseSettings):
 
     # Judge settings
     MAX_EXECUTION_TIME: int = 5  # seconds
-    MAX_MEMORY: int = 256 * 1024 * 1024  # 256MB
-    MAX_PROCESSES: int = 5
-    MAX_OUTPUT_SIZE: int = 1024 * 1024  # 1MB
+    MAX_MEMORY: int = 4 * 1024  # MB
+    MAX_PROCESSES: int = 4
+    MAX_OUTPUT_SIZE: int = 16 * 1024 * 1024  # 16 MB
 
     # Security settings
     ALLOWED_HOSTS: list[str] = ["*"]
 
     # Code execution
     CODE_EXECUTION_DIR: str = "/tmp/mini_judge"
+
+    # Worker settings
+    MAX_WORKERS: int = multiprocessing.cpu_count()
+    MAX_TASK_EXECUTION_TIME: int = 60
+    RESULT_EXPIRY_TIME: int = 3600
 
     model_config = {"env_file": ".env"}
 

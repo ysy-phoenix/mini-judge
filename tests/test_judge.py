@@ -21,7 +21,7 @@ print(add(a, b))
         "language": Language.PYTHON.value,
         "mode": JudgeMode.ACM.value,
         "test_cases": [{"input": "1 2", "expected": "3"}, {"input": "1 3", "expected": "4"}],
-        "time_limit": 1000,
+        "time_limit": 1,
         "memory_limit": 256,
     }
 

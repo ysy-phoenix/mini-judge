@@ -11,20 +11,15 @@ class CompilationError(Exception):
 
 
 async def compile_code(code: str, language: Language, working_dir: str) -> tuple[str, str | None]:
-    r"""Compile the submitted code if needed and return the executable path."""
+    r"""Compile the submitted code if needed and return the executable path or code itself."""
     if language == Language.PYTHON:
-        # Python doesn't need compilation, just write to a file
-        file_path = os.path.join(working_dir, "solution.py")
-        with open(file_path, "w") as f:
-            f.write(code)
-        return file_path, None
+        # For Python, just return the code directly - no compilation needed
+        return code, None
 
-    elif language == Language.C:
+    if language == Language.C:
         return await _compile_c(code, working_dir)
-
     elif language == Language.CPP:
         return await _compile_cpp(code, working_dir)
-
     else:
         raise ValueError(f"Unsupported language: {language}")
 

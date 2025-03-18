@@ -7,6 +7,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.utils.logger import log_with_context
 from app.utils.redis import close_redis, get_redis
+from app.workers.manager import WorkerManager
 
 
 @asynccontextmanager
@@ -19,12 +20,13 @@ async def lifespan(app: FastAPI):
         "Redis connection established", {"host": settings.REDIS_HOST, "port": settings.REDIS_PORT}
     )
 
+    worker_manager = WorkerManager()
     yield
 
-    # log the application shutdown
     log_with_context("Application shutting down")
 
-    # Close Redis on shutdown
+    worker_manager.shutdown()
+
     await close_redis()
     log_with_context("Redis connection closed")
 

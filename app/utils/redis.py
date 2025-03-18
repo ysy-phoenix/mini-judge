@@ -58,3 +58,13 @@ async def get_from_queue(queue_name: str) -> str | None:
     if task:
         return task.decode("utf-8")
     return None
+
+
+async def get_result(task_id: str) -> dict[str, Any] | None:
+    """从结果队列获取评测结果"""
+    redis_conn = await get_redis()
+    key = f"{settings.REDIS_PREFIX}result:{task_id}"
+    data = await redis_conn.get(key)
+    if data:
+        return json.loads(data)
+    return None

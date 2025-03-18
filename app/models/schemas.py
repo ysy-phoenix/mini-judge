@@ -36,7 +36,7 @@ class JudgeRequest(BaseModel):
     language: Language
     mode: JudgeMode
     test_cases: list[JudgeTestCase]
-    time_limit: int | None = 1000  # ms
+    time_limit: int | None = 1  # seconds
     memory_limit: int | None = 256  # MB
 
 
@@ -45,6 +45,7 @@ class TestCaseResult(BaseModel):
     execution_time: float | None = None  # ms
     memory_usage: int | None = None  # KB
     error_message: str | None = None
+    expected_output: str | None = None
     actual_output: str | None = None
 
 

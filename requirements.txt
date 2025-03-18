@@ -9,5 +9,8 @@ pytest-asyncio
 httpx
 rich
 psutil
+datasets
+huggingface_hub
+hf_transfer
 ruff
 pre-commit

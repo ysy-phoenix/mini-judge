@@ -9,13 +9,6 @@ from app.models.schemas import JudgeMode, JudgeStatus, JudgeTestCase, Language
 from app.utils.logger import log_with_context
 
 
-def truncate_output(output: str, max_length: int = 256) -> str:
-    if len(output) <= max_length:
-        return output
-    else:
-        return output[: max_length // 2] + "[... truncated ...]" + output[-max_length // 2 :]
-
-
 class ExecutionResult:
     def __init__(
         self,
@@ -51,21 +44,22 @@ async def monitor_process_memory(pid: int, stop_event: asyncio.Event) -> int:
 
 
 async def execute_code(
-    executable_path: str,
+    executable_path_or_code: str,
     language: Language,
     mode: JudgeMode,
     test_case: JudgeTestCase,
-    time_limit_ms: int,
-    memory_limit_mb: int,
+    time_limit_sec: int = settings.MAX_EXECUTION_TIME,
+    memory_limit_mb: int = settings.MAX_MEMORY,
 ) -> ExecutionResult:
     r"""Execute code with specified constraints and return the result."""
-    time_limit_sec = time_limit_ms / 1000
     memory_limit_bytes = memory_limit_mb * 1024 * 1024
 
     if language == Language.PYTHON:
-        cmd = ["python", executable_path]
+        # Pass code directly using -c flag
+        cmd = ["python", "-c", executable_path_or_code]
     else:  # C or C++
-        cmd = [executable_path]
+        # For compiled languages, use the executable path
+        cmd = [executable_path_or_code]
 
     return await _execute_with_limits(cmd, test_case.input, time_limit_sec, memory_limit_bytes)
 
@@ -113,7 +107,7 @@ async def _execute_with_limits(
         try:
             stdout, stderr = await asyncio.wait_for(
                 process.communicate(input_data.encode()),
-                timeout=time_limit_sec * 1.5,  # Give some extra time for process creation
+                timeout=time_limit_sec + 1,  # Give some extra time for process creation
             )
 
             execution_time = (time.time() - start_time) * 1000  # Convert to ms
@@ -129,8 +123,8 @@ async def _execute_with_limits(
                 # maxrss is in KB on most Unix systems
                 memory_usage = rusage.ru_maxrss
 
-            stdout_str = truncate_output(stdout.decode("utf-8", errors="replace"))
-            stderr_str = truncate_output(stderr.decode("utf-8", errors="replace"))
+            stdout_str = stdout.decode("utf-8", errors="replace")
+            stderr_str = stderr.decode("utf-8", errors="replace")
 
             if process.returncode != 0:
                 return ExecutionResult(
