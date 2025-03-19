@@ -32,6 +32,10 @@ class JudgeTestCase(BaseModel):
     expected: str
 
 
+def generate_uuid():
+    return str(uuid.uuid4())
+
+
 class Submission(BaseModel):
     code: str = Field(..., description="Source code to be judged")
     language: Language
@@ -39,11 +43,7 @@ class Submission(BaseModel):
     test_cases: list[JudgeTestCase]
     time_limit: int | None = 1  # seconds
     memory_limit: int | None = 256  # MB
-    task_id: str | None = None
-
-    def __post_init__(self):
-        if self.task_id is None:
-            self.task_id = str(uuid.uuid4())
+    task_id: str | None = Field(default_factory=generate_uuid)
 
 
 class TestCaseResult(BaseModel):

@@ -1,5 +1,3 @@
-import uuid
-
 from fastapi import APIRouter, HTTPException
 
 from app.core.config import settings
@@ -14,10 +12,8 @@ MAX_WAIT_TIME = 60  # seconds
 
 @router.post("", response_model=JudgeResult)
 async def create_judge_task(submission: Submission) -> JudgeResult:
-    """Submit code for judging and wait for the result (using worker pool)"""
+    r"""Submit code for judging and wait for the result."""
     try:
-        if submission.task_id is None:
-            submission.task_id = str(uuid.uuid4())
         redis = await get_redis()
         await redis.rpush(f"{settings.REDIS_SUBMISSION_QUEUE}", submission.model_dump_json())
         _, result = await redis.blpop(

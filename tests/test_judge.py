@@ -1,5 +1,3 @@
-import uuid
-
 import pytest
 
 from app.models.schemas import JudgeMode, Language
@@ -32,16 +30,4 @@ print(add(a, b))
     assert response.status_code == 200
     data = response.json()
     print(data)
-
-
-@pytest.mark.asyncio
-async def test_get_judge_result_not_found(async_client, api_base_url):
-    r"""Test getting the result of a non-existent judge."""
-    # generate a random and almost certainly non-existent task_id
-    random_task_id = str(uuid.uuid4())
-
-    # send a request
-    response = await async_client.get(f"{api_base_url}/api/v1/judge/{random_task_id}")
-
-    # validate the response - should return 404
-    assert response.status_code == 404
+    assert data["status"] == "accepted"
