@@ -11,23 +11,13 @@ from app.models.schemas import (
 )
 from app.services.compiler import compile_code
 from app.services.executor import execute_code
+from app.services.utils import MAX_TEST_CASE_RESULTS, STATUS_PRIORITY
 from app.utils.logger import logger
 from app.utils.security import (
     clean_execution_directory,
     create_secure_execution_directory,
     is_code_safe,
 )
-
-STATUS_PRIORITY = {
-    JudgeStatus.SYSTEM_ERROR: 1,
-    JudgeStatus.COMPILATION_ERROR: 2,
-    JudgeStatus.RUNTIME_ERROR: 3,
-    JudgeStatus.TIME_LIMIT_EXCEEDED: 4,
-    JudgeStatus.MEMORY_LIMIT_EXCEEDED: 5,
-    JudgeStatus.WRONG_ANSWER: 6,
-    JudgeStatus.ACCEPTED: 7,
-}
-MAX_TEST_CASE_RESULTS = 3
 
 
 def truncate_output(output: str, max_length: int = 256) -> str:
@@ -95,7 +85,7 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
             # Compare the output with expected output
             if result.status == JudgeStatus.ACCEPTED:
                 if submission.mode == JudgeMode.LEETCODE:
-                    if "False" in result.output:
+                    if "Process returned code 1" in result.error:
                         result.status = JudgeStatus.WRONG_ANSWER
                     else:
                         passed_cases += 1

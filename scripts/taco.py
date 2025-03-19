@@ -1,3 +1,4 @@
+import argparse
 import ast
 import json
 import math
@@ -15,7 +16,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-DEFAULT_TIME_LIMIT = 6
+DEFAULT_TIME_LIMIT = 30
 DEFAULT_MEMORY_LIMIT = 4 * 1024
 MIN_MEMORY_LIMIT = 4 * 1024
 API_BASE_URL = "http://localhost:8000/api/v1/judge"
@@ -27,7 +28,7 @@ def extract_time_limit(time_limit: str | None) -> int:
     assert "second" in time_limit
     numbers = re.findall(r"\d+\.?\d*", time_limit)
     if numbers:
-        return math.ceil(max(float(num) for num in numbers)) + 5
+        return math.ceil(max(float(num) for num in numbers)) + 10
     return DEFAULT_TIME_LIMIT
 
 
@@ -91,14 +92,18 @@ def handle_string(data: list[Any]) -> list[Any]:
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", type=str, default="acm", choices=["acm", "leetcode"])
+    args = parser.parse_args()
     console = Console()
+    source_map = {"acm": "codeforces", "leetcode": "leetcode"}
 
     ds = load_dataset("likaixin/TACO-verified", split="train", trust_remote_code=True)
-    max_samples = 10
+    max_samples = 512
 
     submissions = {}
     for sample in ds:
-        if sample.get("source") != "leetcode":
+        if sample.get("source") != source_map[args.mode]:
             continue
         code = normalize_indentation(sample.get("solutions")[0])
         input_output = json.loads(sample.get("input_output"))
@@ -109,12 +114,12 @@ def main():
 
         time_limit = extract_time_limit(sample.get("time_limit"))
         memory_limit = extract_memory_limit(sample.get("memory_limit"))
-        inputs = handle_string(inputs)
-        outputs = handle_string(outputs)
+        inputs = handle_string(inputs) if args.mode == "leetcode" else inputs
+        outputs = handle_string(outputs) if args.mode == "leetcode" else outputs
         submission = {
             "code": code,
             "language": "python",
-            "mode": "leetcode",
+            "mode": args.mode,
             "test_cases": [
                 {"input": inp, "expected": out} for inp, out in zip(inputs, outputs, strict=False)
             ],
@@ -131,16 +136,9 @@ def main():
     benchmark_end = time.time()
     total_time = benchmark_end - benchmark_start
 
-    for id, result in results:
+    for _, result in results:
         if result.get("status") != "accepted":
-            print(result.get("status"))
-            print(result.get("test_case_results"))
-            submission = submissions[id]
-            input_data = submission.get("test_cases")[0].get("input")
-            expected = submission.get("test_cases")[0].get("expected")
-            print(submission.get("code"))
-            print(input_data, input_data[0], type(input_data[0]))
-            print(expected, type(expected))
+            print(json.dumps(result, indent=4))
 
     print_stress_test_summary(results, total_time, max_samples, console)
 

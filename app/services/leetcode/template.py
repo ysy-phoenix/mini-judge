@@ -1,17 +1,8 @@
 SCRIPT = """
 import sys
-import os
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["NUMEXPR_NUM_THREADS"] = "1"
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
-os.environ["GOTO_NUM_THREADS"] = "1"
-
 import json
 import inspect
 import ast
-import numpy as np
 
 # Embedded user code begins here
 {user_code}
@@ -26,8 +17,6 @@ def is_floats(x) -> bool:
         return True
     if isinstance(x, (list, tuple)):
         return all(isinstance(i, float) for i in x)
-    if isinstance(x, np.ndarray):
-        return x.dtype == np.float64 or x.dtype == np.float32
     return False
 
 
@@ -37,9 +26,9 @@ def assertion(out, exp, atol=0):
     if atol == 0 and is_floats(exp):
         atol = 1e-6
     if not exact_match and atol != 0:
-        return np.allclose(out, exp, rtol=1e-07, atol=atol)
+        assert all(abs(a - b) <= atol for a, b in zip(out, exp))
     else:
-        return exact_match
+        assert exact_match
 
 def main():
     # Get all names defined in the global scope
@@ -82,18 +71,19 @@ def main():
                 result = method(input_data)
 
             # Check if result matches expected output
-            if assertion(result, expected):
-                print("True")
-            else:
-                print("False")
-                print(result)
+            print(result)
+            assertion(result, expected)
+            exit(0)
         else:
-            print("False")  # No solution class or function found
-            print("No solution class or function found")
+            print("No solution class or function found", file=sys.stderr)
+            exit(2)
+    except AssertionError as e:
+        print("AssertionError: ", str(e), file=sys.stderr)
+        exit(1)
     except Exception as e:
         # Any exception during execution counts as failure
-        print("False")
         print("Exception: ", str(e), file=sys.stderr)
+        exit(3)
 
 if __name__ == "__main__":
     main()

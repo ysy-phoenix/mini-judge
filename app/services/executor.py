@@ -1,11 +1,11 @@
 import asyncio
-import resource
 import time
 
 import psutil
 
 from app.core.config import settings
 from app.models.schemas import JudgeMode, JudgeStatus, JudgeTestCase, Language
+from app.services.utils import reliability_guard
 from app.utils.logger import logger
 
 
@@ -85,7 +85,7 @@ async def _execute_with_limits(
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            preexec_fn=lambda: _set_resource_limits(time_limit_sec, memory_limit_bytes),
+            preexec_fn=lambda: reliability_guard(time_limit_sec, memory_limit_bytes),
         )
 
         # Start memory monitoring in parallel FIXME: memory monitoring is enabled
@@ -108,14 +108,16 @@ async def _execute_with_limits(
             stderr_str = stderr.decode("utf-8", errors="replace").strip()
 
             if process.returncode != 0:
-                logger.error(f"input:\n{input_data}")
-                logger.error(f"stderr:\n{stderr_str}")
-                logger.error(f"stdout:\n{stdout_str}")
+                if process.returncode == 137:
+                    status = JudgeStatus.MEMORY_LIMIT_EXCEEDED
+                else:
+                    status = JudgeStatus.RUNTIME_ERROR
+                stderr_str = f"Process returned code {process.returncode}\n{stderr_str}"
                 return ExecutionResult(
-                    status=JudgeStatus.RUNTIME_ERROR,
+                    status=status,
                     execution_time=execution_time,
                     memory_usage=memory_usage,
-                    output=stderr_str,  # Use stdout for error output
+                    output=stdout_str,
                     error=stderr_str,
                 )
 
@@ -130,6 +132,7 @@ async def _execute_with_limits(
         except asyncio.TimeoutError:
             # Kill the process if it timed out
             stop_event.set()
+            memory_usage = await memory_task
 
             try:
                 process.kill()
@@ -139,7 +142,7 @@ async def _execute_with_limits(
             return ExecutionResult(
                 status=JudgeStatus.TIME_LIMIT_EXCEEDED,
                 execution_time=time_limit_sec,  # We report the full time limit
-                memory_usage=0,
+                memory_usage=memory_usage,
                 output="",
                 error="Time limit exceeded",
             )
@@ -148,18 +151,3 @@ async def _execute_with_limits(
         stop_event.set()
         logger.error(f"Execution error: {str(e)}")
         return ExecutionResult(status=JudgeStatus.SYSTEM_ERROR, error=f"Execution error: {str(e)}")
-
-
-def _set_resource_limits(time_limit_sec: float, memory_limit_bytes: int):
-    r"""Set resource limits for the subprocess."""
-    # Set CPU time limit (add a small buffer)
-    resource.setrlimit(resource.RLIMIT_CPU, (int(time_limit_sec) + 1, int(time_limit_sec) + 1))
-
-    # Set memory limit
-    resource.setrlimit(resource.RLIMIT_AS, (memory_limit_bytes, memory_limit_bytes))
-
-    # Limit number of processes/threads
-    resource.setrlimit(resource.RLIMIT_NPROC, (settings.MAX_PROCESSES, settings.MAX_PROCESSES))
-
-    # Prevent any file creation
-    resource.setrlimit(resource.RLIMIT_FSIZE, (settings.MAX_OUTPUT_SIZE, settings.MAX_OUTPUT_SIZE))
