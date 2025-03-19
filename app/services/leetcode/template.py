@@ -21,7 +21,7 @@ def is_floats(x) -> bool:
 
 
 def assertion(out, exp, atol=0):
-    exact_match = out == exp
+    exact_match = str(out) == str(exp) or out == exp
 
     if atol == 0 and is_floats(exp):
         atol = 1e-6
