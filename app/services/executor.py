@@ -55,38 +55,26 @@ async def execute_code(
 ) -> ExecutionResult:
     r"""Execute code with specified constraints and return the result."""
     memory_limit_bytes = memory_limit_mb * 1024 * 1024
-
+    cmd = []
+    input_data = test_case.input
     if language == Language.PYTHON:
-        # Pass code directly using -c flag
+        if mode == JudgeMode.LEETCODE:
+            expected = test_case.expected
+            executable_path_or_code = executable_path_or_code(
+                input_data=f"{input_data=}", expected=f"{expected=}"
+            )
+            input_data = ""  # FIXME: For LeetCode, input_data is None
         cmd = ["python", "-c", executable_path_or_code]
     else:  # C or C++
         # For compiled languages, use the executable path
         cmd = [executable_path_or_code]
-
-    return await _execute_with_limits(cmd, test_case.input, time_limit_sec, memory_limit_bytes)
+    return await _execute_with_limits(cmd, input_data, time_limit_sec, memory_limit_bytes)
 
 
 async def _execute_with_limits(
     cmd: list[str], input_data: str, time_limit_sec: float, memory_limit_bytes: int
 ) -> ExecutionResult:
     r"""Execute a command with resource constraints."""
-
-    # Define the resource limit function for the subprocess
-    def set_limits():
-        # Set CPU time limit (add a small buffer)
-        resource.setrlimit(resource.RLIMIT_CPU, (int(time_limit_sec) + 1, int(time_limit_sec) + 1))
-
-        # Set memory limit
-        resource.setrlimit(resource.RLIMIT_AS, (memory_limit_bytes, memory_limit_bytes))
-
-        # Limit number of processes/threads
-        resource.setrlimit(resource.RLIMIT_NPROC, (settings.MAX_PROCESSES, settings.MAX_PROCESSES))
-
-        # Prevent any file creation
-        resource.setrlimit(
-            resource.RLIMIT_FSIZE, (settings.MAX_OUTPUT_SIZE, settings.MAX_OUTPUT_SIZE)
-        )
-
     start_time = time.time()
     stop_event = asyncio.Event()
 
@@ -97,7 +85,7 @@ async def _execute_with_limits(
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            preexec_fn=set_limits,
+            preexec_fn=lambda: _set_resource_limits(time_limit_sec, memory_limit_bytes),
         )
 
         # Start memory monitoring in parallel FIXME: memory monitoring is enabled
@@ -116,10 +104,13 @@ async def _execute_with_limits(
             stop_event.set()
             memory_usage = await memory_task
 
-            stdout_str = stdout.decode("utf-8", errors="replace")
-            stderr_str = stderr.decode("utf-8", errors="replace")
+            stdout_str = stdout.decode("utf-8", errors="replace").strip()
+            stderr_str = stderr.decode("utf-8", errors="replace").strip()
 
             if process.returncode != 0:
+                logger.error(f"input:\n{input_data}")
+                logger.error(f"stderr:\n{stderr_str}")
+                logger.error(f"stdout:\n{stdout_str}")
                 return ExecutionResult(
                     status=JudgeStatus.RUNTIME_ERROR,
                     execution_time=execution_time,
@@ -155,4 +146,20 @@ async def _execute_with_limits(
 
     except Exception as e:
         stop_event.set()
+        logger.error(f"Execution error: {str(e)}")
         return ExecutionResult(status=JudgeStatus.SYSTEM_ERROR, error=f"Execution error: {str(e)}")
+
+
+def _set_resource_limits(time_limit_sec: float, memory_limit_bytes: int):
+    r"""Set resource limits for the subprocess."""
+    # Set CPU time limit (add a small buffer)
+    resource.setrlimit(resource.RLIMIT_CPU, (int(time_limit_sec) + 1, int(time_limit_sec) + 1))
+
+    # Set memory limit
+    resource.setrlimit(resource.RLIMIT_AS, (memory_limit_bytes, memory_limit_bytes))
+
+    # Limit number of processes/threads
+    resource.setrlimit(resource.RLIMIT_NPROC, (settings.MAX_PROCESSES, settings.MAX_PROCESSES))
+
+    # Prevent any file creation
+    resource.setrlimit(resource.RLIMIT_FSIZE, (settings.MAX_OUTPUT_SIZE, settings.MAX_OUTPUT_SIZE))

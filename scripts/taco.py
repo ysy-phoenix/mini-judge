@@ -1,3 +1,4 @@
+import ast
 import json
 import math
 import re
@@ -5,6 +6,7 @@ import time
 from collections import Counter
 from multiprocessing import Pool
 from statistics import mean, median
+from typing import Any
 
 import requests
 from datasets import load_dataset
@@ -14,8 +16,8 @@ from rich.panel import Panel
 from rich.table import Table
 
 DEFAULT_TIME_LIMIT = 6
-DEFAULT_MEMORY_LIMIT = 1024
-MIN_MEMORY_LIMIT = 256
+DEFAULT_MEMORY_LIMIT = 4 * 1024
+MIN_MEMORY_LIMIT = 4 * 1024
 API_BASE_URL = "http://localhost:8000/api/v1/judge"
 
 
@@ -42,57 +44,103 @@ def extract_memory_limit(memory_limit: str | None) -> int:
     return DEFAULT_MEMORY_LIMIT
 
 
-def judge(request: dict) -> dict:
+def judge(submission: dict) -> dict:
+    id, submission = submission
     start_time = time.time()
-    response = requests.post(API_BASE_URL, json=request)
+    response = requests.post(API_BASE_URL, json=submission)
     end_time = time.time()
     result = response.json()
     # Add request latency to the result
     result["request_latency"] = (end_time - start_time) * 1000  # ms
-    return result
+    return id, result
+
+
+def normalize_indentation(code: str) -> str:
+    lines = code.splitlines()
+    result = []
+
+    has_tabs = any("\t" in line for line in lines)
+
+    for line in lines:
+        line = line.rstrip()
+        leading_space = len(line) - len(line.lstrip())
+
+        if has_tabs:
+            line = line.replace("\t", "    ")
+            leading_space = len(line) - len(line.lstrip())
+
+        if leading_space > 0:
+            indent_level = (leading_space + 2) // 4
+            line = " " * (indent_level * 4) + line.lstrip()
+
+        result.append(line)
+
+    return "\n".join(result)
+
+
+def handle_string(data: list[Any]) -> list[Any]:
+    try:
+        if isinstance(data, str):
+            return ast.literal_eval(data)
+        elif isinstance(data, list) or isinstance(data, tuple):
+            return [handle_string(item) for item in data]
+        else:
+            return data
+    except Exception:
+        return data
 
 
 def main():
     console = Console()
 
     ds = load_dataset("likaixin/TACO-verified", split="train", trust_remote_code=True)
-    max_samples = 512
+    max_samples = 10
 
-    requests_data = []
-    problems_data = []
+    submissions = {}
     for sample in ds:
-        if sample.get("source") != "codeforces":
+        if sample.get("source") != "leetcode":
             continue
-        code = sample.get("solutions")
+        code = normalize_indentation(sample.get("solutions")[0])
         input_output = json.loads(sample.get("input_output"))
         inputs = input_output.get("inputs")
         outputs = input_output.get("outputs")
-        if not code or not inputs or not outputs or not isinstance(inputs[0], str):
+        if not code or not inputs or not outputs:
             continue
 
         time_limit = extract_time_limit(sample.get("time_limit"))
         memory_limit = extract_memory_limit(sample.get("memory_limit"))
-        request = {
-            "code": code[0],
+        inputs = handle_string(inputs)
+        outputs = handle_string(outputs)
+        submission = {
+            "code": code,
             "language": "python",
-            "mode": "acm",
+            "mode": "leetcode",
             "test_cases": [
                 {"input": inp, "expected": out} for inp, out in zip(inputs, outputs, strict=False)
             ],
             "time_limit": time_limit,
             "memory_limit": memory_limit,
         }
-        requests_data.append(request)
-        problems_data.append(sample.get("question"))
-
-        if len(requests_data) >= max_samples:
+        submissions[sample.get("id")] = submission
+        if len(submissions) >= max_samples:
             break
 
     benchmark_start = time.time()
     with Pool(512) as pool:
-        results = pool.map(judge, requests_data)
+        results = pool.map(judge, submissions.items())
     benchmark_end = time.time()
     total_time = benchmark_end - benchmark_start
+
+    for id, result in results:
+        if result.get("status") != "accepted":
+            print(result.get("status"))
+            print(result.get("test_case_results"))
+            submission = submissions[id]
+            input_data = submission.get("test_cases")[0].get("input")
+            expected = submission.get("test_cases")[0].get("expected")
+            print(submission.get("code"))
+            print(input_data, input_data[0], type(input_data[0]))
+            print(expected, type(expected))
 
     print_stress_test_summary(results, total_time, max_samples, console)
 
@@ -100,6 +148,7 @@ def main():
 def print_stress_test_summary(results, total_time, total_samples, console):
     r"""Generate and print a comprehensive stress test summary."""
     # Status distribution
+    results = [result for _, result in results]
     status_counts = Counter(result.get("status") for result in results)
     accepted_count = status_counts.get("accepted", 0)
     success_rate = (accepted_count / len(results)) * 100 if results else 0

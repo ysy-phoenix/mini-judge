@@ -2,6 +2,7 @@ import asyncio
 import time
 
 from app.models.schemas import (
+    JudgeMode,
     JudgeResult,
     JudgeStatus,
     Language,
@@ -53,7 +54,7 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
 
     try:
         executable_path_or_code, compile_error = await compile_code(
-            submission.code, submission.language, working_dir
+            submission.code, submission.mode, submission.language, working_dir
         )
         if compile_error:
             logger.error(
@@ -93,14 +94,19 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
         ):
             # Compare the output with expected output
             if result.status == JudgeStatus.ACCEPTED:
-                # Normalize output (trim whitespace, etc.)
-                normalized_output = _normalize_output(result.output)
-                normalized_expected = _normalize_output(test_case.expected)
-
-                if normalized_output != normalized_expected:
-                    result.status = JudgeStatus.WRONG_ANSWER
+                if submission.mode == JudgeMode.LEETCODE:
+                    if "False" in result.output:
+                        result.status = JudgeStatus.WRONG_ANSWER
+                    else:
+                        passed_cases += 1
                 else:
-                    passed_cases += 1
+                    normalized_output = _normalize_output(result.output)
+                    normalized_expected = _normalize_output(test_case.expected)
+
+                    if normalized_output != normalized_expected:
+                        result.status = JudgeStatus.WRONG_ANSWER
+                    else:
+                        passed_cases += 1
 
             # Update stats
             max_execution_time = max(max_execution_time, result.execution_time)
@@ -123,7 +129,7 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                         execution_time=result.execution_time,
                         memory_usage=result.memory_usage,
                         error_message=truncate_output(result.error) if result.error else None,
-                        expected_output=truncate_output(test_case.expected),
+                        expected_output=truncate_output(str(test_case.expected)),
                         actual_output=truncate_output(result.output),
                     )
                 )
@@ -146,7 +152,13 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
         )
 
     except Exception as e:
-        logger.error(f"Judge process error: [red]{submission.task_id}[/red] | [red]{str(e)}[/red]")
+        import traceback
+
+        logger.error(
+            f"Judge process error: [red]{submission.task_id.split('-')[0]}[/red] |"
+            f" [red]{str(e)}[/red]"
+        )
+        logger.error(traceback.format_exc())
         return JudgeResult(status=JudgeStatus.SYSTEM_ERROR, error_message=f"Judge error: {str(e)}")
 
     finally:

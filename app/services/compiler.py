@@ -1,7 +1,10 @@
 import os
 import subprocess
+from functools import partial
 
-from app.models.schemas import Language
+from app.models.schemas import JudgeMode, Language
+from app.services.leetcode.analyzer import preprocess_user_code
+from app.services.leetcode.template import SCRIPT
 
 
 class CompilationError(Exception):
@@ -10,13 +13,18 @@ class CompilationError(Exception):
     pass
 
 
-async def compile_code(code: str, language: Language, working_dir: str) -> tuple[str, str | None]:
+async def compile_code(
+    code: str, mode: JudgeMode, language: Language, working_dir: str
+) -> tuple[str, str | None]:
     r"""Compile the submitted code if needed and return the executable path or code itself."""
     if language == Language.PYTHON:
-        # For Python, just return the code directly - no compilation needed
-        return code, None
-
-    if language == Language.C:
+        if mode == JudgeMode.ACM:
+            return code, None
+        elif mode == JudgeMode.LEETCODE:
+            code = preprocess_user_code(code)
+            template = partial(SCRIPT.format, user_code=code)
+            return template, None
+    elif language == Language.C:
         return await _compile_c(code, working_dir)
     elif language == Language.CPP:
         return await _compile_cpp(code, working_dir)

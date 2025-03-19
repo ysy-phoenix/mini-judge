@@ -1,5 +1,6 @@
 import uuid
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -28,8 +29,8 @@ class JudgeStatus(str, Enum):
 
 
 class JudgeTestCase(BaseModel):
-    input: str
-    expected: str
+    input: str | list[Any]
+    expected: Any
 
 
 def generate_uuid():
