@@ -117,6 +117,10 @@ pre-commit run --all-files
 - [x] support FullCode Mode
 - [x] organize the doc
 
+## 🙏 Acknowledgements
+
+- [code-judge](https://github.com/0xWJ/code-judge)
+- [evalplus](https://github.com/evalplus/evalplus)
 
 ## 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
