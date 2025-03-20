@@ -13,7 +13,6 @@ from scripts.utils import judge, print_stress_test_summary
 
 LEETCODE_TIME_LIMIT = 30
 LEETCODE_MEMORY_LIMIT = 4 * 1024
-MAX_CODE_LENGTH = 65536
 
 
 def format_full_code(sample: dict) -> str:
@@ -65,7 +64,8 @@ EMPTY_TESTCASES = [
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str, default="fullcode", choices=["leetcode", "fullcode"])
-    parser.add_argument("--max-samples", type=int, default=512, help="max samples")
+    parser.add_argument("--samples", type=int, default=512, help="max samples")
+    parser.add_argument("--workers", type=int, default=128, help="max workers")
     return parser.parse_args()
 
 
@@ -83,8 +83,6 @@ def main():
             if args.mode == "fullcode"
             else sample.get("prompt") + "\n\n" + sample.get("completion")
         )
-        if len(code) > MAX_CODE_LENGTH:
-            continue
 
         if args.mode == "leetcode" and "Node" in code:
             continue
@@ -111,13 +109,13 @@ def main():
             "memory_limit": LEETCODE_MEMORY_LIMIT,
         }
         submissions[sample.get("task_id")] = submission
-        if len(submissions) >= args.max_samples:
+        if len(submissions) >= args.samples:
             break
 
     print(f"Max code length: {max_code_length}")
     benchmark_start = time.time()
 
-    with Pool(512) as pool:
+    with Pool(args.workers) as pool:
         results = pool.map(judge, submissions.items())
 
     benchmark_end = time.time()

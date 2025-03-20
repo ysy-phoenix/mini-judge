@@ -11,6 +11,7 @@ from app.utils.redis import get_redis
 from app.workers.judge_worker import JudgeWorker
 
 INTERVAL = 120
+RECOVER_INTERVAL = 1
 
 
 async def recover_lost_tasks():
@@ -19,9 +20,8 @@ async def recover_lost_tasks():
 
     try:
         task_keys = await redis.keys(f"{settings.REDIS_PREFIX}task:*")
-        now = time.time()
         recovered = 0
-        logger.info(f"Recovering {len(task_keys)} tasks")
+        queue_length = await redis.llen(settings.REDIS_SUBMISSION_QUEUE)
         for key in task_keys:
             try:
                 pipe = redis.pipeline()
@@ -33,7 +33,8 @@ async def recover_lost_tasks():
                 submitted_at = float(submitted_at) if submitted_at else None
 
                 task_id = key.decode("utf-8").split(":")[-1]
-                if status == JudgeStatus.PENDING and submitted_at and now - submitted_at > 10:
+                if status == JudgeStatus.PENDING and queue_length == 0:
+                    # FIXME: This is a temporary fix for the lost task recovery
                     logger.warning(f"Found lost pending task: {task_id}!")
                     recovered += 1
 
@@ -61,7 +62,6 @@ async def recover_lost_tasks():
     finally:
         # Ensure the connection is closed
         await redis.close()
-        logger.info("Redis connection closed")
 
 
 class WorkerManager:
@@ -163,7 +163,7 @@ class WorkerManager:
             except Exception as e:
                 logger.error(f"Recovery thread error: {str(e)}")
 
-            time.sleep(5)
+            time.sleep(RECOVER_INTERVAL)
 
     def shutdown(self):
         r"""Shutdown all workers."""
