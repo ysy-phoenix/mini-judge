@@ -52,13 +52,28 @@ Start the server
 
 ```bash
 uvicorn app.main:app --reload
+# warm up
+python scripts/warmup.py
+
+# check health
+curl http://localhost:8000/api/v1/health
+
+# check queue status
+curl http://localhost:8000/api/v1/health/queue
 ```
 
-Stress test (512 samples, expected completion time: 1 minute)
+Stress Test
 
 ```bash
-python scripts/taco.py
+# ACM Mode
+python scripts/taco.py --mode acm --samples 3072
+
+# Full Mode
+python scripts/leetcode.py --mode fullcode --samples 3072
 ```
+
+> [!Note]
+> Although we implemented leetcode mode(core function mode), there exists many issues, so we don't recommend using it.
 
 ## 🛠 Development
 

@@ -45,7 +45,7 @@ def judge(submission: dict) -> dict:
     end_time = time.time()
     result = response.json()
     # Add request latency to the result
-    result["request_latency"] = (end_time - start_time) * 1000  # ms
+    result["request_latency"] = end_time - start_time  # seconds
     return id, result
 
 
@@ -85,10 +85,10 @@ def print_stress_test_summary(results, total_time, total_samples, console):
     summary_table.add_row("Throughput", f"{throughput:.2f} requests/second")
 
     if latencies:
-        summary_table.add_row("Avg Request Latency", f"{mean(latencies):.2f} ms")
-        summary_table.add_row("Median Request Latency", f"{median(latencies):.2f} ms")
+        summary_table.add_row("Avg Request Latency", f"{mean(latencies):.2f} seconds")
+        summary_table.add_row("Median Request Latency", f"{median(latencies):.2f} seconds")
         summary_table.add_row(
-            "Min/Max Request Latency", f"{min(latencies):.2f}/{max(latencies):.2f} ms"
+            "Min/Max Request Latency", f"{min(latencies):.2f}/{max(latencies):.2f} seconds"
         )
 
     if execution_times:

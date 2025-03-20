@@ -31,7 +31,7 @@ async def create_judge_task(submission: Submission) -> JudgeResult:
 
         # Submit task to queue
         await redis.rpush(f"{settings.REDIS_SUBMISSION_QUEUE}", submission.model_dump_json())
-        await redis.incr(f"{settings.REDIS_PREFIX}submitted_count")
+        await redis.incr(settings.REDIS_SUBMITTED_COUNT)
     except Exception as e:
         logger.error(f"Error pushing submission to Redis: {str(e)}")
         return JudgeResult(

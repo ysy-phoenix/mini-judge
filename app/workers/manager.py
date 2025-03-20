@@ -10,9 +10,6 @@ from app.utils.logger import logger
 from app.utils.redis import get_redis
 from app.workers.judge_worker import JudgeWorker
 
-INTERVAL = 120
-RECOVER_INTERVAL = 1
-
 
 async def recover_lost_tasks():
     r"""Recover lost tasks."""
@@ -64,6 +61,81 @@ async def recover_lost_tasks():
         await redis.close()
 
 
+async def cleanup_expired_keys():
+    r"""Clean up expired keys in Redis that weren't automatically cleaned up."""
+    redis = await get_redis()
+    current_time = time.time()
+    deleted_count = 0
+
+    try:
+        # 1. clean expired task status
+        cursor = 0
+        while True:
+            cursor, keys = await redis.scan(
+                cursor, match=f"{settings.REDIS_PREFIX}task:*", count=1000
+            )
+            if keys:
+                pipe = redis.pipeline()
+                keys_to_delete = []
+
+                # Check each key's submission time
+                for key in keys:
+                    submitted_at = await redis.hget(key, "submitted_at")
+                    if submitted_at:
+                        submitted_at = float(submitted_at)
+                        # If the task has expired
+                        if current_time - submitted_at > settings.RESULT_EXPIRY_TIME:
+                            keys_to_delete.append(key)
+                            task_id = key.decode("utf-8").split(":")[-1]
+                            # Delete the corresponding result queue
+                            pipe.delete(f"{settings.REDIS_RESULT_QUEUE}:{task_id}")
+
+                # Delete expired keys in batch
+                if keys_to_delete:
+                    for key in keys_to_delete:
+                        pipe.delete(key)
+                    await pipe.execute()
+                    deleted_count += len(keys_to_delete)
+
+            if cursor == 0:
+                break
+
+        # 2. clean possible orphaned result queues
+        cursor = 0
+        orphaned_results = 0
+        while True:
+            cursor, result_keys = await redis.scan(
+                cursor, match=f"{settings.REDIS_RESULT_QUEUE}:*", count=1000
+            )
+            if result_keys:
+                pipe = redis.pipeline()
+                for key in result_keys:
+                    task_id = key.decode("utf-8").split(":")[-1]
+                    task_key = f"{settings.REDIS_PREFIX}task:{task_id}"
+                    # Check if the corresponding task still exists
+                    if not await redis.exists(task_key):
+                        pipe.delete(key)
+                        orphaned_results += 1
+
+                if orphaned_results > 0:
+                    await pipe.execute()
+
+            if cursor == 0:
+                break
+
+        if deleted_count > 0 or orphaned_results > 0:
+            logger.info(
+                f"Cleanup completed: removed {deleted_count} expired tasks",
+                f"and {orphaned_results} orphaned results",
+            )
+
+    except Exception as e:
+        logger.error(f"Error during Redis cleanup: {str(e)}")
+    finally:
+        # Ensure the connection is closed
+        await redis.close()
+
+
 class WorkerManager:
     r"""Manages a pool of worker processes."""
 
@@ -92,6 +164,13 @@ class WorkerManager:
             target=self._run_recovery, name="worker-recovery", daemon=True
         )
         self._recovery_thread.start()
+
+        # Start cleanup thread
+        self._cleanup_thread = threading.Thread(
+            target=self._run_cleanup, name="redis-cleanup", daemon=True
+        )
+        self._cleanup_thread.start()
+        logger.info("Started Redis cleanup thread")
 
     def _monitor_workers(self):
         r"""Monitor worker processes and restart if needed."""
@@ -147,7 +226,7 @@ class WorkerManager:
             )
 
             # Sleep before next check
-            time.sleep(INTERVAL)
+            time.sleep(settings.MONITOR_INTERVAL)
 
     def _run_recovery(self):
         r"""Run task recovery thread."""
@@ -163,7 +242,23 @@ class WorkerManager:
             except Exception as e:
                 logger.error(f"Recovery thread error: {str(e)}")
 
-            time.sleep(RECOVER_INTERVAL)
+            time.sleep(settings.RECOVER_INTERVAL)
+
+    def _run_cleanup(self):
+        r"""Run Redis cleanup thread to periodically remove expired keys."""
+        logger.info("Starting Redis cleanup thread")
+
+        while self.running:
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(cleanup_expired_keys())
+                loop.close()
+
+            except Exception as e:
+                logger.error(f"Cleanup thread error: {str(e)}")
+
+            time.sleep(settings.CLEANUP_INTERVAL)
 
     def shutdown(self):
         r"""Shutdown all workers."""

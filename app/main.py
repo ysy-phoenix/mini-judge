@@ -39,9 +39,9 @@ async def reset_redis_state(redis):
 
     # 1. Reset counters
     counters = [
-        f"{settings.REDIS_PREFIX}processed_count",
-        f"{settings.REDIS_PREFIX}submitted_count",
-        f"{settings.REDIS_PREFIX}fetched_count",
+        settings.REDIS_PROCESSED_COUNT,
+        settings.REDIS_SUBMITTED_COUNT,
+        settings.REDIS_FETCHED_COUNT,
     ]
 
     pipe = redis.pipeline()

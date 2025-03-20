@@ -23,6 +23,7 @@ class JudgeWorker(Process):
         try:
             # Update task status to running
             await redis.hset(task_key, "status", JudgeStatus.RUNNING)
+            await redis.expire(task_key, settings.RESULT_EXPIRY_TIME)
 
             # Process task
             result = await process_judge_task(submission)
@@ -34,7 +35,7 @@ class JudgeWorker(Process):
             )
 
             # Increment processed count
-            await redis.incr(f"{settings.REDIS_PREFIX}processed_count")
+            await redis.incr(settings.REDIS_PROCESSED_COUNT)
         except Exception as e:
             logger.error(
                 f"Worker {self.worker_id} process task error: [red]{submission.task_id}[/red] | "
@@ -58,7 +59,7 @@ class JudgeWorker(Process):
             try:
                 # Block until we get a task
                 _, data = await redis.blpop(settings.REDIS_SUBMISSION_QUEUE)
-                await redis.incr(f"{settings.REDIS_PREFIX}fetched_count")
+                await redis.incr(settings.REDIS_FETCHED_COUNT)
                 submission = Submission.model_validate_json(data)
                 await self._process_task(submission)
             except Exception as e:

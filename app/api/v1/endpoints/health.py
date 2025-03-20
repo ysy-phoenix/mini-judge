@@ -33,17 +33,17 @@ async def queue_status():
 
         pending_count = await redis.llen(settings.REDIS_SUBMISSION_QUEUE)
 
-        processed_count = await redis.get(f"{settings.REDIS_PREFIX}processed_count")
+        processed_count = await redis.get(settings.REDIS_PROCESSED_COUNT)
         processed_count = int(processed_count) if processed_count else 0
-        submitted_count = await redis.get(f"{settings.REDIS_PREFIX}submitted_count")
+        submitted_count = await redis.get(settings.REDIS_SUBMITTED_COUNT)
         submitted_count = int(submitted_count) if submitted_count else 0
-        fetched_count = await redis.get(f"{settings.REDIS_PREFIX}fetched_count")
+        fetched_count = await redis.get(settings.REDIS_FETCHED_COUNT)
         fetched_count = int(fetched_count) if fetched_count else 0
         return {
             "pending": pending_count,
+            "fetched": fetched_count,
             "processed": processed_count,
             "submitted": submitted_count,
-            "fetched": fetched_count,
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}

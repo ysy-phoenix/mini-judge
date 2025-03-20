@@ -54,12 +54,13 @@ def handle_string(data: list[Any]) -> list[Any]:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str, default="acm", choices=["acm", "leetcode"])
+    parser.add_argument("--samples", type=int, default=512, help="max samples")
+    parser.add_argument("--workers", type=int, default=128, help="max workers")
     args = parser.parse_args()
     console = Console()
     source_map = {"acm": "codeforces", "leetcode": "leetcode"}
 
     ds = load_dataset("likaixin/TACO-verified", split="train", trust_remote_code=True)
-    max_samples = 512
 
     submissions = {}
     for sample in ds:
@@ -87,11 +88,11 @@ def main():
             "memory_limit": memory_limit,
         }
         submissions[sample.get("id")] = submission
-        if len(submissions) >= max_samples:
+        if len(submissions) >= args.samples:
             break
 
     benchmark_start = time.time()
-    with Pool(512) as pool:
+    with Pool(args.workers) as pool:
         results = pool.map(judge, submissions.items())
     benchmark_end = time.time()
     total_time = benchmark_end - benchmark_start
@@ -100,7 +101,7 @@ def main():
         if result.get("status") != "accepted":
             print(json.dumps(result, indent=4))
 
-    print_stress_test_summary(results, total_time, max_samples, console)
+    print_stress_test_summary(results, total_time, len(submissions), console)
 
 
 if __name__ == "__main__":
