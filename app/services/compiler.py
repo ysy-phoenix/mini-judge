@@ -1,3 +1,4 @@
+import hashlib
 import os
 import subprocess
 from functools import partial
@@ -19,7 +20,10 @@ async def compile_code(
     r"""Compile the submitted code if needed and return the executable path or code itself."""
     if language == Language.PYTHON:
         if mode == JudgeMode.ACM:
-            return code, None
+            file_path = os.path.join(working_dir, f"{hashlib.md5(code.encode()).hexdigest()}.py")
+            with open(file_path, "w") as f:
+                f.write(code)
+            return file_path, None
         elif mode == JudgeMode.LEETCODE:
             code = preprocess_user_code(code)
             template = partial(SCRIPT.format, user_code=code)

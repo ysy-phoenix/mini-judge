@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import os
 import time
 
 import psutil
@@ -52,6 +54,7 @@ async def execute_code(
     test_case: JudgeTestCase,
     time_limit_sec: int = settings.MAX_EXECUTION_TIME,
     memory_limit_mb: int = settings.MAX_MEMORY,
+    working_dir: str = None,
 ) -> ExecutionResult:
     r"""Execute code with specified constraints and return the result."""
     memory_limit_bytes = memory_limit_mb * 1024 * 1024
@@ -64,7 +67,14 @@ async def execute_code(
                 input_data=f"{input_data=}", expected=f"{expected=}"
             )
             input_data = ""  # FIXME: For LeetCode, input_data is None
-        cmd = ["python", "-c", executable_path_or_code]
+            file_path = os.path.join(
+                working_dir, f"{hashlib.md5(input_data.encode()).hexdigest()}.py"
+            )
+            with open(file_path, "w") as f:
+                f.write(executable_path_or_code)
+            cmd = ["python", file_path]
+        else:
+            cmd = ["python", executable_path_or_code]
     else:  # C or C++
         # For compiled languages, use the executable path
         cmd = [executable_path_or_code]
@@ -149,5 +159,5 @@ async def _execute_with_limits(
 
     except Exception as e:
         stop_event.set()
-        logger.error(f"Execution error: {str(e)}")
+        logger.error(f"Execute with limits exception: {str(e)}")
         return ExecutionResult(status=JudgeStatus.SYSTEM_ERROR, error=f"Execution error: {str(e)}")

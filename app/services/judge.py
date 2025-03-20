@@ -5,7 +5,6 @@ from app.models.schemas import (
     JudgeMode,
     JudgeResult,
     JudgeStatus,
-    Language,
     Submission,
     TestCaseResult,
 )
@@ -38,9 +37,7 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
             error_message="Code contains potentially unsafe operations",
         )
 
-    working_dir = None
-    if submission.language in [Language.C, Language.CPP]:
-        working_dir = create_secure_execution_directory()
+    working_dir = create_secure_execution_directory()
 
     try:
         executable_path_or_code, compile_error = await compile_code(
@@ -61,6 +58,7 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                 test_case,
                 submission.time_limit,
                 submission.memory_limit,
+                working_dir,
             )
             for test_case in submission.test_cases
         ]

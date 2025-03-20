@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from app.core.config import settings
-from app.models.schemas import JudgeResult, Submission
+from app.models.schemas import JudgeResult, JudgeStatus, Submission
 from app.utils.logger import logger
 from app.utils.redis import get_redis
 
@@ -24,4 +24,4 @@ async def create_judge_task(submission: Submission) -> JudgeResult:
 
     except Exception as e:
         logger.error(f"Error processing judge task: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        return JudgeResult(status=JudgeStatus.SYSTEM_ERROR, error_message=str(e))

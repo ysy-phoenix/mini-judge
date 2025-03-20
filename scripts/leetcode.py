@@ -52,7 +52,7 @@ def extract_output(output_str: str) -> Any:
 def main():
     console = Console()
     ds = load_dataset("newfacade/LeetCodeDataset", split="train", trust_remote_code=True)
-    max_samples = 5
+    max_samples = 128
 
     submissions = {}
     samples = {}
