@@ -30,8 +30,10 @@ class Settings(BaseSettings):
 
     # Worker settings
     MAX_WORKERS: int = multiprocessing.cpu_count()
+    MAX_LATENCY: int = 60
     MAX_TASK_EXECUTION_TIME: int = 60
     RESULT_EXPIRY_TIME: int = 3600
+    REDIS_WORKER_QUEUE: str = f"{REDIS_PREFIX}queue:workers"
 
     model_config = {"env_file": ".env"}
 

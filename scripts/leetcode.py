@@ -9,7 +9,11 @@ from typing import Any
 from datasets import load_dataset
 from rich.console import Console
 
-from scripts.utils import DEFAULT_MEMORY_LIMIT, DEFAULT_TIME_LIMIT, judge, print_stress_test_summary
+from scripts.utils import judge, print_stress_test_summary
+
+LEETCODE_TIME_LIMIT = 30
+LEETCODE_MEMORY_LIMIT = 4 * 1024
+MAX_CODE_LENGTH = 65536
 
 
 def format_full_code(sample: dict) -> str:
@@ -72,12 +76,15 @@ def main():
 
     submissions = {}
     samples = {}
+    max_code_length = 0
     for sample in ds:
         code = (
             format_full_code(sample)
             if args.mode == "fullcode"
             else sample.get("prompt") + "\n\n" + sample.get("completion")
         )
+        if len(code) > MAX_CODE_LENGTH:
+            continue
 
         if args.mode == "leetcode" and "Node" in code:
             continue
@@ -93,21 +100,21 @@ def main():
                 for test_case in sample.get("input_output")
             ]
 
-        time_limit = DEFAULT_TIME_LIMIT
-        memory_limit = DEFAULT_MEMORY_LIMIT
         samples[sample.get("task_id")] = sample
+        max_code_length = max(max_code_length, len(code))
         submission = {
             "code": code,
             "language": "python",
             "mode": args.mode,
             "test_cases": testcases,
-            "time_limit": time_limit,
-            "memory_limit": memory_limit,
+            "time_limit": LEETCODE_TIME_LIMIT,
+            "memory_limit": LEETCODE_MEMORY_LIMIT,
         }
         submissions[sample.get("task_id")] = submission
         if len(submissions) >= args.max_samples:
             break
 
+    print(f"Max code length: {max_code_length}")
     benchmark_start = time.time()
 
     with Pool(512) as pool:

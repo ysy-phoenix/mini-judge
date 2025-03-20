@@ -2,7 +2,7 @@ import asyncio
 from multiprocessing import Process
 
 from app.core.config import settings
-from app.models.schemas import Submission
+from app.models.schemas import JudgeResult, JudgeStatus, Submission
 from app.services.judge import process_judge_task
 from app.utils.logger import logger
 from app.utils.redis import get_redis
@@ -17,17 +17,37 @@ class JudgeWorker(Process):
         self.daemon = True
 
     async def _process_task(self, submission: Submission):
+        redis = await get_redis()
+        task_key = f"{settings.REDIS_PREFIX}task:{submission.task_id}"
+
         try:
+            # Update task status to running
+            await redis.hset(task_key, "status", JudgeStatus.RUNNING)
+
+            # Process task
             result = await process_judge_task(submission)
-            redis = await get_redis()
+
+            # Save result and update status
             await redis.rpush(
                 f"{settings.REDIS_RESULT_QUEUE}:{submission.task_id}",
                 result.model_dump_json(),
             )
+
+            # Increment processed count
+            await redis.incr(f"{settings.REDIS_PREFIX}processed_count")
         except Exception as e:
             logger.error(
                 f"Worker {self.worker_id} process task error: [red]{submission.task_id}[/red] | "
                 f"[red]{str(e)}[/red]"
+            )
+
+            # Even if there is an error, provide a result to avoid client permanent waiting
+            error_result = JudgeResult(
+                status=JudgeStatus.SYSTEM_ERROR, error_message=str(e), task_id=submission.task_id
+            )
+            await redis.rpush(
+                f"{settings.REDIS_RESULT_QUEUE}:{submission.task_id}",
+                error_result.model_dump_json(),
             )
 
     async def _run_async_loop(self):
@@ -38,6 +58,7 @@ class JudgeWorker(Process):
             try:
                 # Block until we get a task
                 _, data = await redis.blpop(settings.REDIS_SUBMISSION_QUEUE)
+                await redis.incr(f"{settings.REDIS_PREFIX}fetched_count")
                 submission = Submission.model_validate_json(data)
                 await self._process_task(submission)
             except Exception as e:
@@ -58,3 +79,6 @@ class JudgeWorker(Process):
             pass
         finally:
             loop.close()
+
+
+# curl http://localhost:8000/api/v1/health/queue

@@ -1,13 +1,67 @@
+import asyncio
 import threading
 import time
 
 import psutil
 
 from app.core.config import settings
+from app.models.schemas import JudgeResult, JudgeStatus
 from app.utils.logger import logger
+from app.utils.redis import get_redis
 from app.workers.judge_worker import JudgeWorker
 
 INTERVAL = 120
+
+
+async def recover_lost_tasks():
+    r"""Recover lost tasks."""
+    redis = await get_redis()
+
+    try:
+        task_keys = await redis.keys(f"{settings.REDIS_PREFIX}task:*")
+        now = time.time()
+        recovered = 0
+        logger.info(f"Recovering {len(task_keys)} tasks")
+        for key in task_keys:
+            try:
+                pipe = redis.pipeline()
+                pipe.hget(key, "status")
+                pipe.hget(key, "submitted_at")
+                status, submitted_at = await pipe.execute()
+
+                status = status.decode("utf-8") if status else None
+                submitted_at = float(submitted_at) if submitted_at else None
+
+                task_id = key.decode("utf-8").split(":")[-1]
+                if status == JudgeStatus.PENDING and submitted_at and now - submitted_at > 10:
+                    logger.warning(f"Found lost pending task: {task_id}!")
+                    recovered += 1
+
+                    task_data = await redis.hget(key, "data")
+                    if task_data:
+                        await redis.rpush(settings.REDIS_SUBMISSION_QUEUE, task_data)
+                        logger.info(f"Requeued task {task_id}")
+                    else:
+                        error_result = JudgeResult(
+                            status=JudgeStatus.SYSTEM_ERROR,
+                            error_message="Task lost and could not be recovered",
+                            task_id=task_id,
+                        )
+                        await redis.rpush(
+                            f"{settings.REDIS_RESULT_QUEUE}:{task_id}",
+                            error_result.model_dump_json(),
+                        )
+                        logger.warning(f"Could not recover task {task_id}, marked as error")
+            except Exception as e:
+                logger.error(f"Error processing task key {key}: {str(e)}")
+
+        if recovered > 0:
+            logger.info(f"Recovered {recovered} lost or stalled tasks")
+
+    finally:
+        # Ensure the connection is closed
+        await redis.close()
+        logger.info("Redis connection closed")
 
 
 class WorkerManager:
@@ -32,6 +86,12 @@ class WorkerManager:
             target=self._monitor_workers, name="worker-monitor", daemon=True
         )
         self._monitor_thread.start()
+
+        # Start recovery thread
+        self._recovery_thread = threading.Thread(
+            target=self._run_recovery, name="worker-recovery", daemon=True
+        )
+        self._recovery_thread.start()
 
     def _monitor_workers(self):
         r"""Monitor worker processes and restart if needed."""
@@ -89,8 +149,24 @@ class WorkerManager:
             # Sleep before next check
             time.sleep(INTERVAL)
 
+    def _run_recovery(self):
+        r"""Run task recovery thread."""
+        logger.info("Starting task recovery thread")
+
+        while self.running:
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(recover_lost_tasks())
+                loop.close()
+
+            except Exception as e:
+                logger.error(f"Recovery thread error: {str(e)}")
+
+            time.sleep(5)
+
     def shutdown(self):
-        """Shutdown all workers"""
+        r"""Shutdown all workers."""
         self.running = False
         for worker in self.workers:
             if worker.is_alive():

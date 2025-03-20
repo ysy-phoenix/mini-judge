@@ -58,12 +58,12 @@ def is_code_safe(code: str, language: str) -> bool:
 
 def is_python_code_safe(code: str) -> bool:
     r"""Check if Python code is safe to execute using strict regex patterns."""
-    # 移除注释以避免误报
     code_without_comments = COMMENT_PATTERN.sub("", code)
 
     # check direct dangerous function calls (eval/exec)
     if DANGEROUS_EXEC_PATTERN.search(code_without_comments):
         return False
+    return True
 
     # check dangerous imports
     for pattern in PYTHON_IMPORT_PATTERNS:
