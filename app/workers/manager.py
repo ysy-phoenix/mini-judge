@@ -125,8 +125,8 @@ async def cleanup_expired_keys():
 
         if deleted_count > 0 or orphaned_results > 0:
             logger.info(
-                f"Cleanup completed: removed {deleted_count} expired tasks",
-                f"and {orphaned_results} orphaned results",
+                f"Cleanup completed: removed {deleted_count} expired tasks "
+                f"and {orphaned_results} orphaned results"
             )
 
     except Exception as e:

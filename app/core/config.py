@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     # Manager settings
     MONITOR_INTERVAL: int = 10
     RECOVER_INTERVAL: int = 1
-    CLEANUP_INTERVAL: int = 300
+    CLEANUP_INTERVAL: int = 900
 
     model_config = {"env_file": ".env"}
 
