@@ -48,7 +48,7 @@ uv pip install -e .
 
 ## 🚀 Quick Start
 
-Start the server
+### Start the server
 
 ```bash
 uvicorn app.main:app --reload
@@ -62,7 +62,7 @@ curl http://localhost:8000/api/v1/health
 curl http://localhost:8000/api/v1/health/queue
 ```
 
-Stress Test
+### Stress Test
 
 ```bash
 # ACM Mode
@@ -72,8 +72,14 @@ python scripts/taco.py --mode acm --samples 3072
 python scripts/leetcode.py --mode fullcode --samples 3072
 ```
 
-> [!Note]
+> [!Warning]
 > Although we implemented leetcode mode(core function mode), there exists many issues, so we don't recommend using it.
+>
+> Besides, C/C++ is not supported yet.
+
+### Advanced Usage
+
+Please refer to the [Tutorial](docs/tutorial.md) and scripts for more details.
 
 ## 🛠 Development
 
@@ -106,7 +112,11 @@ pre-commit run --all-files
 ## 🛣 Roadmap
 
 - [x] high concurrency (maybe)
-- [ ] support LeetCode Mode
+- [x] support ACM Mode
+- [x] support LeetCode Mode (deprecated)
+- [x] support FullCode Mode
+- [x] organize the doc
+
 
 ## 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
