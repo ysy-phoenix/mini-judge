@@ -17,6 +17,7 @@ dependencies = [
     "datasets",
     "huggingface_hub",
     "hf_transfer",
+    "ratelimit",
 ]
 requires-python = ">=3.10"
 readme = "README.md"

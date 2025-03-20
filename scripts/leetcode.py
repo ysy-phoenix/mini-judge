@@ -1,3 +1,4 @@
+import argparse
 import ast
 import json
 import re
@@ -49,20 +50,48 @@ def extract_output(output_str: str) -> Any:
         return output_str
 
 
+EMPTY_TESTCASES = [
+    {
+        "input": "",
+        "expected": "",
+    },
+]
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", type=str, default="fullcode", choices=["leetcode", "fullcode"])
+    parser.add_argument("--max-samples", type=int, default=512, help="max samples")
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
     console = Console()
     ds = load_dataset("newfacade/LeetCodeDataset", split="train", trust_remote_code=True)
-    max_samples = 128
 
     submissions = {}
     samples = {}
     for sample in ds:
-        # code = format_full_code(sample)
-        code = sample.get("prompt") + "\n\n" + sample.get("completion")
-        test_cases = sample.get("input_output")
+        code = (
+            format_full_code(sample)
+            if args.mode == "fullcode"
+            else sample.get("prompt") + "\n\n" + sample.get("completion")
+        )
 
-        if not code or not test_cases or "Node" in code:
+        if args.mode == "leetcode" and "Node" in code:
             continue
+
+        if args.mode == "fullcode":
+            testcases = EMPTY_TESTCASES
+        else:
+            testcases = [
+                {
+                    "input": extract_input(test_case.get("input")),
+                    "expected": extract_output(test_case.get("output")),
+                }
+                for test_case in sample.get("input_output")
+            ]
 
         time_limit = DEFAULT_TIME_LIMIT
         memory_limit = DEFAULT_MEMORY_LIMIT
@@ -70,24 +99,20 @@ def main():
         submission = {
             "code": code,
             "language": "python",
-            "mode": "leetcode",
-            "test_cases": [
-                {
-                    "input": extract_input(test_case.get("input")),
-                    "expected": extract_output(test_case.get("output")),
-                }
-                for test_case in test_cases
-            ],
+            "mode": args.mode,
+            "test_cases": testcases,
             "time_limit": time_limit,
             "memory_limit": memory_limit,
         }
         submissions[sample.get("task_id")] = submission
-        if len(submissions) >= max_samples:
+        if len(submissions) >= args.max_samples:
             break
 
     benchmark_start = time.time()
+
     with Pool(512) as pool:
         results = pool.map(judge, submissions.items())
+
     benchmark_end = time.time()
     total_time = benchmark_end - benchmark_start
 
@@ -96,7 +121,7 @@ def main():
             print(json.dumps(result, indent=4))
             print(submissions[id].get("code"))
 
-    print_stress_test_summary(results, total_time, max_samples, console)
+    print_stress_test_summary(results, total_time, len(submissions), console)
 
 
 if __name__ == "__main__":

@@ -12,5 +12,6 @@ psutil
 datasets
 huggingface_hub
 hf_transfer
+ratelimit
 ruff
 pre-commit

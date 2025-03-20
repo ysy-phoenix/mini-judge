@@ -14,6 +14,7 @@ class Language(str, Enum):
 class JudgeMode(str, Enum):
     LEETCODE = "leetcode"
     ACM = "acm"
+    FULLCODE = "fullcode"
 
 
 class JudgeStatus(str, Enum):

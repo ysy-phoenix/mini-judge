@@ -82,7 +82,7 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
         ):
             # Compare the output with expected output
             if result.status == JudgeStatus.ACCEPTED:
-                if submission.mode == JudgeMode.LEETCODE:
+                if submission.mode != JudgeMode.ACM:
                     if "Process returned code 1" in result.error:
                         result.status = JudgeStatus.WRONG_ANSWER
                     else:
