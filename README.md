@@ -81,6 +81,8 @@ python scripts/leetcode.py --mode fullcode --samples 3072
 
 Please refer to the [Tutorial](docs/tutorial.md) and scripts for more details.
 
+For multi-node deployment add RL training, please refer to the [multi-node](docs/multi-node.md).
+
 ## 🛠 Development
 
 ### Code Quality Tools
