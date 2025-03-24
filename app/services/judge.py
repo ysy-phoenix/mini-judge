@@ -82,7 +82,7 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
         ):
             # Compare the output with expected output
             if result.status == JudgeStatus.ACCEPTED:
-                if submission.mode != JudgeMode.ACM:
+                if submission.mode == JudgeMode.LEETCODE:
                     if "Process returned code 1" in result.error:
                         result.status = JudgeStatus.WRONG_ANSWER
                     else:
@@ -122,6 +122,9 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                     )
                 )
 
+        error_message = None
+        if overall_status != JudgeStatus.ACCEPTED:
+            error_message = test_case_results[0].error_message
         status_color = "green" if overall_status == JudgeStatus.ACCEPTED else "red"
         logger.info(
             f"[cyan] Submission {submission.task_id.split('-')[0]}: [/cyan]"
@@ -129,6 +132,8 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
             f"[magenta]Passed {passed_cases}/{len(submission.test_cases)} cases[/magenta] | "
             f"[yellow]Total time: {execution_time:.2f} seconds[/yellow]"
         )
+        if error_message is not None:
+            logger.error(f"Error message: {error_message}")
 
         # Return final response
         return JudgeResult(
@@ -137,6 +142,7 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
             memory_usage=max_memory_usage,
             test_case_results=test_case_results,
             task_id=submission.task_id,
+            error_message=error_message,
         )
 
     except Exception as e:
