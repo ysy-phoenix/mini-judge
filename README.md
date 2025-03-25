@@ -68,6 +68,7 @@ curl http://localhost:8000/api/v1/health
 # check queue status
 curl http://localhost:8000/api/v1/health/queue
 ```
+
 ### pytest
 
 ```bash
@@ -78,10 +79,11 @@ pytest tests/test_judge.py -v -s
 
 ```bash
 # ACM Mode
-python scripts/taco.py --mode acm --samples 3072
+python scripts/taco.py --source codeforces --samples 8192
+# large samples for full dataset
 
 # Full Mode
-python scripts/leetcode.py --mode fullcode --samples 3072
+python scripts/leetcode.py --mode fullcode --samples 8192
 ```
 
 > [!Warning]
@@ -135,6 +137,7 @@ pre-commit run --all-files
 
 - [code-judge](https://github.com/0xWJ/code-judge)
 - [evalplus](https://github.com/evalplus/evalplus)
+- [code-r1](https://github.com/ganler/code-r1)
 
 ## 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
