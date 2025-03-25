@@ -86,6 +86,8 @@ python scripts/taco.py --source codeforces --samples 8192
 python scripts/leetcode.py --mode fullcode --samples 8192
 ```
 
+Stress test results are available [here](docs/stress-test.md).
+
 > [!Warning]
 > Although we implemented leetcode mode(core function mode), there exists many issues, so we don't recommend using it.
 >

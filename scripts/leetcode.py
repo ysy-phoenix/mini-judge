@@ -19,7 +19,7 @@ def format_full_code(sample: dict) -> str:
     code += "\n\n"
     code += sample.get("test")
     code += "\n\n"
-    code += f"check({sample.get('entry_point')})"
+    code += f"check({sample.get('entry_point')})\n"
     return code
 
 
