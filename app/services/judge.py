@@ -90,6 +90,10 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                 else:
                     normalized_output = _normalize_output(result.output)
                     normalized_expected = _normalize_output(test_case.expected)
+                    result.error = (
+                        f"Expected:\n{normalized_expected[:100]}\n"
+                        f"Actual:\n{normalized_output[:100]}"
+                    )
 
                     if normalized_output != normalized_expected:
                         result.status = JudgeStatus.WRONG_ANSWER

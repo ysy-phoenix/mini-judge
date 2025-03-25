@@ -1,6 +1,9 @@
+import ast
+import json
 import math
 import re
 import time
+import warnings
 from collections import Counter
 from statistics import mean, median
 
@@ -9,10 +12,48 @@ from rich import box
 from rich.panel import Panel
 from rich.table import Table
 
-DEFAULT_TIME_LIMIT = 6
-DEFAULT_MEMORY_LIMIT = 4 * 1024
-MIN_MEMORY_LIMIT = 4 * 1024
+DEFAULT_TIME_LIMIT = 30  # seconds
+DEFAULT_MEMORY_LIMIT = 4 * 1024  # MB
+MIN_MEMORY_LIMIT = 128  # MB
 API_BASE_URL = "http://localhost:8000/api/v1/judge"
+EMPTY_TEST_CASES = [
+    {"input": "", "expected": ""},
+]
+BLOCK_LIBS = [
+    "fake-useragent",
+    "keras",
+    "socket",
+    "torch",
+    "scipy",
+    "sklearn",
+    "cv2",
+    "scipy",
+    "imageio",
+    "sphinx-pyproject",
+    "xgboost",
+    "tweepy",
+    "flask",
+    "matplotlib",
+    "pillow",
+    "seaborn",
+    "smtpd",
+]
+
+warnings.filterwarnings("ignore", category=SyntaxWarning)
+
+
+def check_code_with_ast(code):
+    try:
+        ast.parse(code)
+        compile(code, "<string>", "exec")
+        if "eval(" in code or "exec(" in code:  # Filter out unsafe code
+            return False
+        for lib in BLOCK_LIBS:  # Filter out unsafe libraries
+            if lib in code:
+                return False
+        return True
+    except SyntaxError:
+        return False
 
 
 def extract_time_limit(time_limit: str | None) -> int:
@@ -47,6 +88,21 @@ def judge(submission: dict) -> dict:
     # Add request latency to the result
     result["request_latency"] = end_time - start_time  # seconds
     return id, result
+
+
+def dump_failed_result(results: dict, submissions: dict, file_path: str):
+    with open(file_path, "w") as f:
+        for id, result in results:
+            if result.get("status") == "accepted":
+                continue
+            submission = submissions[id]
+            f.write(f"Submission for {id}:\n")
+            f.write(submission["code"])
+            f.write(f"time_limit: {submission['time_limit']}\n")
+            f.write(f"memory_limit: {submission['memory_limit']}\n")
+            f.write(f"Result for {id}:\n")
+            f.write(json.dumps(result, indent=4))
+            f.write("\n")
 
 
 def print_stress_test_summary(results, total_time, total_samples, console):

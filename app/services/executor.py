@@ -120,6 +120,8 @@ async def _execute_with_limits(
             if process.returncode != 0:
                 if process.returncode == -11:
                     status = JudgeStatus.MEMORY_LIMIT_EXCEEDED
+                elif process.returncode == -9:
+                    status = JudgeStatus.TIME_LIMIT_EXCEEDED
                 elif process.returncode == 1 and "AssertionError" in stderr_str:
                     status = JudgeStatus.WRONG_ANSWER  # FIXME: for fullcode mode
                 else:

@@ -26,8 +26,8 @@ Mini-Judge is a lightweight, high-performance online judge system for evaluating
 option 1: conda
 
 ```bash
-conda create -n evalhub python=3.11 -y
-conda activate evalhub
+conda create -n judge python=3.11 -y
+conda activate judge
 
 pip install -r requirements.txt
 pip install -e .
@@ -41,6 +41,13 @@ source .venv/bin/activate
 
 uv pip install -r requirements.txt
 uv pip install -e .
+```
+
+install redis
+
+```bash
+sudo apt update && sudo apt install redis-server
+redis-server --daemonize yes
 ```
 
 > [!Note]
@@ -62,15 +69,24 @@ curl http://localhost:8000/api/v1/health
 curl http://localhost:8000/api/v1/health/queue
 ```
 
+### pytest
+
+```bash
+pytest tests/test_judge.py -v -s
+```
+
 ### Stress Test
 
 ```bash
 # ACM Mode
-python scripts/taco.py --mode acm --samples 3072
+python scripts/taco.py --source codeforces --samples 8192
+# large samples for full dataset
 
 # Full Mode
-python scripts/leetcode.py --mode fullcode --samples 3072
+python scripts/leetcode.py --mode fullcode --samples 8192
 ```
+
+Stress test results are available [here](docs/stress-test.md).
 
 > [!Warning]
 > Although we implemented leetcode mode(core function mode), there exists many issues, so we don't recommend using it.
@@ -123,6 +139,7 @@ pre-commit run --all-files
 
 - [code-judge](https://github.com/0xWJ/code-judge)
 - [evalplus](https://github.com/evalplus/evalplus)
+- [code-r1](https://github.com/ganler/code-r1)
 
 ## 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
