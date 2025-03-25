@@ -26,8 +26,8 @@ Mini-Judge is a lightweight, high-performance online judge system for evaluating
 option 1: conda
 
 ```bash
-conda create -n evalhub python=3.11 -y
-conda activate evalhub
+conda create -n judge python=3.11 -y
+conda activate judge
 
 pip install -r requirements.txt
 pip install -e .
@@ -41,6 +41,13 @@ source .venv/bin/activate
 
 uv pip install -r requirements.txt
 uv pip install -e .
+```
+
+install redis
+
+```bash
+sudo apt update && sudo apt install redis-server
+redis-server --daemonize yes
 ```
 
 > [!Note]
@@ -60,6 +67,11 @@ curl http://localhost:8000/api/v1/health
 
 # check queue status
 curl http://localhost:8000/api/v1/health/queue
+```
+### pytest
+
+```bash
+pytest tests/test_judge.py -v -s
 ```
 
 ### Stress Test
