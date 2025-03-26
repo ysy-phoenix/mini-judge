@@ -3,7 +3,6 @@ import subprocess
 from functools import partial
 
 from app.models.schemas import JudgeMode, Language
-from app.services.leetcode.analyzer import preprocess_user_code
 from app.services.leetcode.template import SCRIPT
 
 
@@ -14,7 +13,7 @@ class CompilationError(Exception):
 
 
 async def compile_code(
-    code: str, mode: JudgeMode, language: Language, working_dir: str
+    code: str, mode: JudgeMode, language: Language, working_dir: str, entry_point: str = None
 ) -> tuple[str, str | None]:
     r"""Compile the submitted code if needed and return the executable path or code itself."""
     if language == Language.PYTHON:
@@ -24,8 +23,7 @@ async def compile_code(
                 f.write(code)
             return file_path, None
         else:  # JudgeMode.FULLCODE
-            code = preprocess_user_code(code)
-            template = partial(SCRIPT.format, user_code=code)
+            template = partial(SCRIPT.format, user_code=code, entry_point=entry_point)
             return template, None
     elif language == Language.C:
         return await _compile_c(code, working_dir)

@@ -9,7 +9,7 @@ EMPTY_TEST_CASES = [
 
 @pytest.mark.asyncio
 async def test_acm_mode_accepted(async_client, api_base_url):
-    """Test ACM mode with correct code - should pass all test cases."""
+    r"""Test ACM mode with correct code - should pass all test cases."""
     test_code = """
 def add(a, b):
     return a + b
@@ -18,7 +18,7 @@ a, b = map(int, input().split())
 print(add(a, b))
     """
 
-    test_request = {
+    submission = {
         "code": test_code,
         "language": Language.PYTHON.value,
         "mode": JudgeMode.ACM.value,
@@ -31,7 +31,7 @@ print(add(a, b))
         "memory_limit": 256,
     }
 
-    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=test_request)
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
 
     assert response.status_code == 200
     data = response.json()
@@ -40,7 +40,7 @@ print(add(a, b))
 
 @pytest.mark.asyncio
 async def test_acm_mode_wrong_answer(async_client, api_base_url):
-    """Test ACM mode with incorrect output - should get wrong answer."""
+    r"""Test ACM mode with incorrect output - should get wrong answer."""
     test_code = """
 def add(a, b):
     return a + b + 1  # Deliberately wrong
@@ -49,7 +49,7 @@ a, b = map(int, input().split())
 print(add(a, b))
     """
 
-    test_request = {
+    submission = {
         "code": test_code,
         "language": Language.PYTHON.value,
         "mode": JudgeMode.ACM.value,
@@ -58,7 +58,7 @@ print(add(a, b))
         "memory_limit": 256,
     }
 
-    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=test_request)
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
 
     assert response.status_code == 200
     data = response.json()
@@ -67,7 +67,7 @@ print(add(a, b))
 
 @pytest.mark.asyncio
 async def test_acm_mode_time_limit_exceeded(async_client, api_base_url):
-    """Test ACM mode with code that exceeds time limit."""
+    r"""Test ACM mode with code that exceeds time limit."""
     test_code = """
 import time
 def fibonacci(n):
@@ -80,7 +80,7 @@ time.sleep(10)
 print(fibonacci(n))
     """
 
-    test_request = {
+    submission = {
         "code": test_code,
         "language": Language.PYTHON.value,
         "mode": JudgeMode.ACM.value,
@@ -91,7 +91,7 @@ print(fibonacci(n))
         "memory_limit": 256,
     }
 
-    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=test_request)
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
 
     assert response.status_code == 200
     data = response.json()
@@ -100,7 +100,7 @@ print(fibonacci(n))
 
 @pytest.mark.asyncio
 async def test_acm_mode_memory_limit_exceeded(async_client, api_base_url):
-    """Test ACM mode with code that exceeds memory limit."""
+    r"""Test ACM mode with code that exceeds memory limit."""
     test_code = """
 n = int(input())
 # Create a large list that consumes lots of memory
@@ -108,7 +108,7 @@ large_list = [0] * (n * 10000000000)  # Will allocate a large amount of memory
 print("Done")
     """
 
-    test_request = {
+    submission = {
         "code": test_code,
         "language": Language.PYTHON.value,
         "mode": JudgeMode.ACM.value,
@@ -117,7 +117,7 @@ print("Done")
         "memory_limit": 1,  # 64MB limit
     }
 
-    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=test_request)
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
 
     assert response.status_code == 200
     data = response.json()
@@ -126,14 +126,14 @@ print("Done")
 
 @pytest.mark.asyncio
 async def test_acm_mode_runtime_error(async_client, api_base_url):
-    """Test ACM mode with code that causes runtime error."""
+    r"""Test ACM mode with code that causes runtime error."""
     test_code = """
 a, b = map(int, input().split())
 result = a / b  # Will cause division by zero
 print(result)
     """
 
-    test_request = {
+    submission = {
         "code": test_code,
         "language": Language.PYTHON.value,
         "mode": JudgeMode.ACM.value,
@@ -142,7 +142,7 @@ print(result)
         "memory_limit": 256,
     }
 
-    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=test_request)
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
 
     assert response.status_code == 200
     data = response.json()
@@ -151,7 +151,7 @@ print(result)
 
 @pytest.mark.asyncio
 async def test_full_mode_accepted(async_client, api_base_url):
-    """Test Full mode with correct code - complex algorithm."""
+    r"""Test Full mode with correct code - complex algorithm."""
     test_code = """
 def is_prime(n):
     if n <= 1:
@@ -186,7 +186,7 @@ def check(candidate):
 check(nth_prime)
 """
 
-    test_request = {
+    submission = {
         "code": test_code,
         "language": Language.PYTHON.value,
         "mode": JudgeMode.FULLCODE.value,
@@ -195,7 +195,7 @@ check(nth_prime)
         "memory_limit": 256,
     }
 
-    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=test_request)
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
 
     assert response.status_code == 200
     data = response.json()
@@ -204,7 +204,7 @@ check(nth_prime)
 
 @pytest.mark.asyncio
 async def test_full_mode_wrong_answer(async_client, api_base_url):
-    """Test Full mode with code that produces wrong answer."""
+    r"""Test Full mode with code that produces wrong answer."""
     test_code = """
 class Solution:
     def twoSum(self, nums, target):
@@ -219,7 +219,7 @@ def check(candidate):
 check(Solution().twoSum)
 """
 
-    test_request = {
+    submission = {
         "code": test_code,
         "language": Language.PYTHON.value,
         "mode": JudgeMode.FULLCODE.value,
@@ -228,7 +228,7 @@ check(Solution().twoSum)
         "memory_limit": 256,
     }
 
-    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=test_request)
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
 
     assert response.status_code == 200
     data = response.json()
@@ -237,13 +237,13 @@ check(Solution().twoSum)
 
 @pytest.mark.asyncio
 async def test_full_mode_time_limit_exceeded(async_client, api_base_url):
-    """Test Full mode with code that times out (inefficient algorithm)."""
+    r"""Test Full mode with code that times out (inefficient algorithm)."""
     test_code = """
 import time
 time.sleep(2)
 """
 
-    test_request = {
+    submission = {
         "code": test_code,
         "language": Language.PYTHON.value,
         "mode": JudgeMode.FULLCODE.value,
@@ -252,7 +252,7 @@ time.sleep(2)
         "memory_limit": 256,
     }
 
-    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=test_request)
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
 
     assert response.status_code == 200
     data = response.json()
@@ -261,7 +261,7 @@ time.sleep(2)
 
 @pytest.mark.asyncio
 async def test_full_mode_memory_limit_exceeded(async_client, api_base_url):
-    """Test Full mode with code that uses too much memory."""
+    r"""Test Full mode with code that uses too much memory."""
     test_code = """
 import sys
 
@@ -279,7 +279,7 @@ all_matrices = []
 assert large_memory_usage() == 0
     """
 
-    test_request = {
+    submission = {
         "code": test_code,
         "language": Language.PYTHON.value,
         "mode": JudgeMode.FULLCODE.value,
@@ -288,7 +288,7 @@ assert large_memory_usage() == 0
         "memory_limit": 1,  # 64MB limit
     }
 
-    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=test_request)
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
 
     assert response.status_code == 200
     data = response.json()
@@ -297,7 +297,7 @@ assert large_memory_usage() == 0
 
 @pytest.mark.asyncio
 async def test_full_mode_runtime_error(async_client, api_base_url):
-    """Test Full mode with code that causes runtime error."""
+    r"""Test Full mode with code that causes runtime error."""
     test_code = """
 def process_list(lst):
     # This will cause an index error
@@ -306,7 +306,7 @@ def process_list(lst):
 assert process_list([1, 2, 3]) == 3
     """
 
-    test_request = {
+    submission = {
         "code": test_code,
         "language": Language.PYTHON.value,
         "mode": JudgeMode.FULLCODE.value,
@@ -315,8 +315,45 @@ assert process_list([1, 2, 3]) == 3
         "memory_limit": 256,
     }
 
-    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=test_request)
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
 
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == JudgeStatus.RUNTIME_ERROR
+
+
+@pytest.mark.asyncio
+async def test_full_code_multiple_test_cases(async_client, api_base_url):
+    r"""Test Full mode with multiple test cases."""
+    test_code = """
+class Solution:
+    def countSeniors(self, details: List[str]) -> int:
+        count = 0
+        for detail in details:
+            age = int(detail[11:13])
+            if age > 60:
+                count += 1
+        return count
+"""
+    inputs = [
+        [["7868190130M7522", "5303914400F9211", "9273338290F4010"]],
+        [["1313579440F2036", "2921522980M5644"]],
+        [["3988132605O4995"]],
+    ]
+    outputs = [2, 0, 0]
+    test_cases = [
+        {"input": input, "expected": output} for input, output in zip(inputs, outputs, strict=False)
+    ]
+    submission = {
+        "code": test_code,
+        "language": Language.PYTHON.value,
+        "mode": JudgeMode.LEETCODE.value,
+        "test_cases": test_cases,
+        "entry_point": "Solution().countSeniors",
+    }
+
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == JudgeStatus.ACCEPTED

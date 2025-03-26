@@ -64,7 +64,7 @@ async def execute_code(
         if mode == JudgeMode.LEETCODE:
             expected = test_case.expected
             executable_path_or_code = executable_path_or_code(
-                input_data=f"{input_data=}", expected=f"{expected=}"
+                inp=f"{input_data=}", out=f"{expected=}"
             )
             input_data = ""  # FIXME: For LeetCode, input_data is None
             file_path = os.path.join(

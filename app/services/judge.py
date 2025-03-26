@@ -41,7 +41,11 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
 
     try:
         executable_path_or_code, compile_error = await compile_code(
-            submission.code, submission.mode, submission.language, working_dir
+            submission.code,
+            submission.mode,
+            submission.language,
+            working_dir,
+            submission.entry_point,
         )
         if compile_error:
             logger.error(
@@ -83,7 +87,7 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
             # Compare the output with expected output
             if result.status == JudgeStatus.ACCEPTED:
                 if submission.mode == JudgeMode.LEETCODE:
-                    if "Process returned code 1" in result.error:
+                    if "returned code 1" in result.error or "AssertionError" in result.error:
                         result.status = JudgeStatus.WRONG_ANSWER
                     else:
                         passed_cases += 1

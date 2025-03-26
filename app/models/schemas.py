@@ -46,6 +46,7 @@ class Submission(BaseModel):
     time_limit: int | None = 1  # seconds
     memory_limit: int | None = 256  # MB
     task_id: str | None = Field(default_factory=generate_uuid)
+    entry_point: str | None = None
 
 
 class TestCaseResult(BaseModel):
