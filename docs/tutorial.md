@@ -92,34 +92,40 @@ LeetCode Mode emulates the LeetCode platform's execution environment, where your
 **Example:**
 ```python
 # Sample solution in LeetCode Mode
+from typing import List
 class Solution:
-    def twoSum(self, nums, target):
-        # Solution implementation
-        seen = {}
-        for i, num in enumerate(nums):
-            complement = target - num
-            if complement in seen:
-                return [seen[complement], i]
-            seen[num] = i
+    def countSeniors(self, details: List[str]) -> int:
+        count = 0
+        for detail in details:
+            age = int(detail[11:13])
+            if age > 60:
+                count += 1
+        return count
 ```
 
 **Submission format:**
-```json
+```python
+inputs = [
+    [["7868190130M7522", "5303914400F9211", "9273338290F4010"]],
+    [["1313579440F2036", "2921522980M5644"]],
+    [["3988132605O4995"]],
+]
+outputs = [2, 0, 0]
+test_cases = [
+    {"input": input, "expected": output} for input, output in zip(inputs, outputs, strict=False)
+]
 {
   "code": "...",
   "language": "python",
   "mode": "leetcode",
-  "test_cases": [
-    {"input": "[2,7,11,15], 9", "expected": "[0,1]"},
-    {"input": "[3,2,4], 6", "expected": "[1,2]"}
-  ],
+  "test_cases": test_cases,
   "time_limit": 1,
   "memory_limit": 256
 }
 ```
 
-> [!Important]
-> We face many issues with the LeetCode mode(such as parameter parsing, unimported modules, etc.), so we don't recommend using it. It's a deprecated feature right now.
+- Note that each input is a list of arguments
+- LeetCode mode also uses test-case wise evaluation like ACM mode
 
 ### FullCode Mode
 

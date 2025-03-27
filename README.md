@@ -89,15 +89,16 @@ python scripts/leetcode.py --mode fullcode --samples 8192
 Stress test results are available [here](docs/stress-test.md).
 
 > [!Warning]
-> Although we implemented leetcode mode(core function mode), there exists many issues, so we don't recommend using it.
->
-> Besides, C/C++ is not supported yet.
+> C/C++ is not supported yet.
 
 ### Advanced Usage
 
 Please refer to the [Tutorial](docs/tutorial.md) and scripts for more details.
 
 For multi-node deployment add RL training, please refer to the [multi-node](docs/multi-node.md).
+
+> [!Important]
+> We recommend turn on the [security check](app/core/config.py) while RL training.
 
 ## 🛠 Development
 
@@ -134,12 +135,14 @@ pre-commit run --all-files
 - [x] support LeetCode Mode (deprecated)
 - [x] support FullCode Mode
 - [x] organize the doc
+- [x] reimplement LeetCode Mode
 
 ## 🙏 Acknowledgements
 
 - [code-judge](https://github.com/0xWJ/code-judge)
 - [evalplus](https://github.com/evalplus/evalplus)
 - [code-r1](https://github.com/ganler/code-r1)
+- [livecodebench](https://github.com/LiveCodeBench/LiveCodeBench)
 
 ## 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
