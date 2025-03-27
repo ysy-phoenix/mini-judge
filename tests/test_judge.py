@@ -349,7 +349,7 @@ class Solution:
         "language": Language.PYTHON.value,
         "mode": JudgeMode.LEETCODE.value,
         "test_cases": test_cases,
-        "entry_point": "Solution().countSeniors",
+        "entry_point": "countSeniors",
     }
 
     response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)

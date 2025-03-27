@@ -1,8 +1,12 @@
+import asyncio
 import faulthandler
 import resource
 
+import psutil
+
 from app.core.config import settings
 from app.models.schemas import JudgeStatus
+from app.utils.logger import logger
 
 STATUS_PRIORITY = {
     JudgeStatus.SYSTEM_ERROR: 1,
@@ -14,6 +18,46 @@ STATUS_PRIORITY = {
     JudgeStatus.ACCEPTED: 7,
 }
 MAX_TEST_CASE_RESULTS = 3
+
+
+def normalize_output(output: str) -> str:
+    r"""Normalize output for comparison.
+    - Trim leading/trailing whitespace
+    - Normalize line endings
+    - Remove empty lines
+    """
+    # First remove trailing newlines explicitly
+    while output.endswith("\n"):
+        output = output[:-1]
+    lines = output.strip().replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    return "\n".join(line.strip() for line in lines if line.strip())
+
+
+def truncate_output(output: str, max_length: int = 256) -> str:
+    if len(output) <= max_length:
+        return output
+    else:
+        return output[: max_length // 2] + "[... truncated ...]" + output[-max_length // 2 :]
+
+
+async def monitor_process_memory(pid: int, stop_event: asyncio.Event) -> int:
+    """Monitor process memory usage periodically until stop_event is set."""
+    max_memory = 0
+    try:
+        process = psutil.Process(pid)
+        while not stop_event.is_set():
+            try:
+                # Get memory usage in MB (RSS - Resident Set Size)
+                memory = process.memory_info().rss // 1024 // 1024
+                max_memory = max(max_memory, memory)
+                await asyncio.sleep(0.01)  # 10ms interval
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                break
+    except psutil.NoSuchProcess:
+        pass
+    except Exception as e:
+        logger.error(f"Error monitoring memory: {str(e)}")
+    return max_memory
 
 
 def reliability_guard(time_limit_sec: float, memory_limit_bytes: int):

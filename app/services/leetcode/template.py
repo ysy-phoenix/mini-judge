@@ -39,16 +39,4 @@ sys.setrecursionlimit(50000)
 
 {user_code}
 
-def _deep_eq(a, b, tol=1e-5):
-    if isinstance(a, float) or isinstance(b, float):
-        return math.isclose(a, b, rel_tol=tol, abs_tol=tol)
-    if isinstance(a, (list, tuple)):
-        if len(a) != len(b): return False
-        return all(_deep_eq(x, y, tol) for x, y in zip(a, b))
-    return a == b
-
-inp = {inp}
-out = {out}
-
-assert _deep_eq({entry_point}(*inp), out)
 """

@@ -1,78 +1,34 @@
 import asyncio
-import hashlib
-import os
 import time
-
-import psutil
+from collections.abc import Callable
 
 from app.core.config import settings
-from app.models.schemas import JudgeMode, JudgeStatus, JudgeTestCase, Language
-from app.services.utils import reliability_guard
+from app.models.schemas import JudgeMode, JudgeStatus, JudgeTestCase, Language, TestCaseResult
+from app.services.leetcode import judge_leetcode
+from app.services.utils import monitor_process_memory, reliability_guard
 from app.utils.logger import logger
 
 
-class ExecutionResult:
-    def __init__(
-        self,
-        status: JudgeStatus,
-        execution_time: float = 0,
-        memory_usage: int = 0,
-        output: str = "",
-        error: str = "",
-    ):
-        self.status = status
-        self.execution_time = execution_time  # in seconds
-        self.memory_usage = memory_usage  # in MB
-        self.output = output
-        self.error = error
-
-
-async def monitor_process_memory(pid: int, stop_event: asyncio.Event) -> int:
-    """Monitor process memory usage periodically until stop_event is set."""
-    max_memory = 0
-    try:
-        process = psutil.Process(pid)
-        while not stop_event.is_set():
-            try:
-                # Get memory usage in MB (RSS - Resident Set Size)
-                memory = process.memory_info().rss // 1024 // 1024
-                max_memory = max(max_memory, memory)
-                await asyncio.sleep(0.01)  # 10ms interval
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                break
-    except psutil.NoSuchProcess:
-        pass
-    except Exception as e:
-        logger.error(f"Error monitoring memory: {str(e)}")
-    return max_memory
-
-
 async def execute_code(
-    executable_path_or_code: str,
+    executable_path_or_code: str | Callable,
     language: Language,
     mode: JudgeMode,
     test_case: JudgeTestCase,
     time_limit_sec: int = settings.MAX_EXECUTION_TIME,
     memory_limit_mb: int = settings.MAX_MEMORY,
-    working_dir: str = None,
-) -> ExecutionResult:
+) -> TestCaseResult:
     r"""Execute code with specified constraints and return the result."""
     memory_limit_bytes = memory_limit_mb * 1024 * 1024
-    cmd = []
     input_data = test_case.input
     if language == Language.PYTHON:
         if mode == JudgeMode.LEETCODE:
-            expected = test_case.expected
-            executable_path_or_code = executable_path_or_code(
-                inp=f"{input_data=}", out=f"{expected=}"
+            return await judge_leetcode(
+                executable_path_or_code,
+                input_data,
+                test_case.expected,
+                time_limit_sec,
+                memory_limit_bytes,
             )
-            input_data = ""  # FIXME: For LeetCode, input_data is None
-            file_path = os.path.join(
-                working_dir, f"{hashlib.md5(input_data.encode()).hexdigest()}.py"
-            )
-            with open(file_path, "w") as f:
-                f.write(executable_path_or_code)
-            cmd = ["python", file_path]
         else:
             cmd = ["python", executable_path_or_code]
     else:  # C or C++
@@ -83,7 +39,7 @@ async def execute_code(
 
 async def _execute_with_limits(
     cmd: list[str], input_data: str, time_limit_sec: float, memory_limit_bytes: int
-) -> ExecutionResult:
+) -> TestCaseResult:
     r"""Execute a command with resource constraints."""
     start_time = time.time()
     stop_event = asyncio.Event()
@@ -127,20 +83,20 @@ async def _execute_with_limits(
                 else:
                     status = JudgeStatus.RUNTIME_ERROR
                 stderr_str = f"Process return code {process.returncode}\n{stderr_str}"
-                return ExecutionResult(
+                return TestCaseResult(
                     status=status,
                     execution_time=execution_time,
                     memory_usage=memory_usage,
-                    output=stdout_str,
-                    error=stderr_str,
+                    actual_output=stdout_str,
+                    error_message=stderr_str,
                 )
 
-            return ExecutionResult(
+            return TestCaseResult(
                 status=JudgeStatus.ACCEPTED,  # This will be compared against expected output later
                 execution_time=execution_time,
                 memory_usage=memory_usage,
-                output=stdout_str,
-                error=stderr_str,
+                actual_output=stdout_str,
+                error_message=stderr_str,
             )
 
         except asyncio.TimeoutError:
@@ -153,15 +109,16 @@ async def _execute_with_limits(
             except Exception:
                 pass
 
-            return ExecutionResult(
+            return TestCaseResult(
                 status=JudgeStatus.TIME_LIMIT_EXCEEDED,
                 execution_time=time_limit_sec,  # We report the full time limit
                 memory_usage=memory_usage,
-                output="",
-                error="Time limit exceeded",
+                error_message="Time limit exceeded",
             )
 
     except Exception as e:
         stop_event.set()
         logger.error(f"Execute with limits exception: {str(e)}")
-        return ExecutionResult(status=JudgeStatus.SYSTEM_ERROR, error=f"Execution error: {str(e)}")
+        return TestCaseResult(
+            status=JudgeStatus.SYSTEM_ERROR, error_message=f"Execution error: {str(e)}"
+        )

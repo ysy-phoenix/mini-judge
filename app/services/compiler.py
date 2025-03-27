@@ -1,15 +1,35 @@
 import os
 import subprocess
-from functools import partial
+from types import ModuleType
 
 from app.models.schemas import JudgeMode, Language
 from app.services.leetcode.template import SCRIPT
 
 
-class CompilationError(Exception):
-    r"""Exception raised when compilation fails."""
-
-    pass
+async def compile_leetcode_code(code: str, entry_point: str = None) -> tuple[str, str | None]:
+    code = SCRIPT.format(user_code=code)
+    try:
+        tmp_module = ModuleType("tmp_solution", "")
+        exec(code, tmp_module.__dict__)
+        compiled_obj = None
+        if "class Solution" in code:
+            compiled_obj = tmp_module.Solution()
+        else:
+            compiled_obj = tmp_module
+        if entry_point:
+            if hasattr(compiled_obj, entry_point):
+                fn = getattr(compiled_obj, entry_point)
+            elif entry_point in tmp_module.__dict__:
+                fn = tmp_module.__dict__[entry_point]
+            else:
+                return "", f"Entry point '{entry_point}' not found"
+            if not callable(fn):
+                return "", f"Entry point '{entry_point}' is not callable"
+            return fn, None
+        else:
+            return "", "No entry point specified"
+    except Exception as e:
+        return "", f"Compilation error: {str(e)}"
 
 
 async def compile_code(
@@ -22,9 +42,8 @@ async def compile_code(
             with open(file_path, "w") as f:
                 f.write(code)
             return file_path, None
-        else:  # JudgeMode.FULLCODE
-            template = partial(SCRIPT.format, user_code=code, entry_point=entry_point)
-            return template, None
+        else:  # JudgeMode.LEETCODE
+            return await compile_leetcode_code(code, entry_point)
     elif language == Language.C:
         return await _compile_c(code, working_dir)
     elif language == Language.CPP:
