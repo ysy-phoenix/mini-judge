@@ -1,6 +1,7 @@
 import asyncio
 import time
 
+from app.core.config import settings
 from app.models.schemas import (
     JudgeMode,
     JudgeResult,
@@ -26,7 +27,7 @@ from app.utils.security import (
 
 async def process_judge_task(submission: Submission) -> JudgeResult:
     r"""Process a judging task directly, without fetching data from Redis"""
-    if not is_code_safe(submission.code, submission.language):
+    if settings.SECURITY_CHECK and not is_code_safe(submission.code, submission.language):
         logger.error(
             f"Code contains potentially unsafe operations: [red]{submission.task_id}[/red]"
         )

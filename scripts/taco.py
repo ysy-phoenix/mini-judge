@@ -1,8 +1,8 @@
 import argparse
+import asyncio
 import json
 import os
 import time
-from multiprocessing import Pool
 from typing import Any
 
 from datasets import load_dataset
@@ -14,8 +14,8 @@ from scripts.utils import (
     dump_failed_result,
     extract_memory_limit,
     extract_time_limit,
-    judge,
     print_stress_test_summary,
+    process_all_submissions,
 )
 
 MAX_CODE_LENGTH = 32768
@@ -151,8 +151,7 @@ def main():
             break
 
     benchmark_start = time.time()
-    with Pool(args.workers) as pool:
-        results = pool.map(judge, submissions.items())
+    results = asyncio.run(process_all_submissions(submissions))
     benchmark_end = time.time()
     total_time = benchmark_end - benchmark_start
 

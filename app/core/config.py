@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Security settings
     ALLOWED_HOSTS: list[str] = ["*"]
+    SECURITY_CHECK: bool = False
 
     # Code execution
     CODE_EXECUTION_DIR: str = "/tmp/mini_judge"

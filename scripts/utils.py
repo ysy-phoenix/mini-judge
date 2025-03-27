@@ -1,16 +1,20 @@
 import ast
+import asyncio
 import json
 import math
+import os
 import re
 import time
 import warnings
 from collections import Counter
 from statistics import mean, median
 
-import requests
+import aiohttp
 from rich import box
 from rich.panel import Panel
 from rich.table import Table
+
+from scripts.pbar import get_progress_bar
 
 DEFAULT_TIME_LIMIT = 30  # seconds
 DEFAULT_MEMORY_LIMIT = 4 * 1024  # MB
@@ -79,15 +83,37 @@ def extract_memory_limit(memory_limit: str | None) -> int:
     return DEFAULT_MEMORY_LIMIT
 
 
-def judge(submission: dict) -> dict:
-    id, submission = submission
+async def judge(id: str, submission: dict) -> dict:
     start_time = time.time()
-    response = requests.post(API_BASE_URL, json=submission)
+    async with aiohttp.ClientSession() as session:
+        async with session.post(API_BASE_URL, json=submission) as response:
+            result = await response.json()
     end_time = time.time()
-    result = response.json()
     # Add request latency to the result
     result["request_latency"] = end_time - start_time  # seconds
     return id, result
+
+
+async def process_all_submissions(submissions: dict):
+    progress = get_progress_bar()
+    tasks = []
+    semaphore = asyncio.Semaphore(os.cpu_count())
+
+    async def limited_judge(id, submission):
+        async with semaphore:
+            return await judge(id, submission)
+
+    with progress:
+        sub = progress.add_task("[cyan]Processing submissions...", total=len(submissions))
+        for id, submission in submissions.items():
+            task = asyncio.create_task(limited_judge(id, submission))
+            tasks.append(task)
+        results = []
+        for future in asyncio.as_completed(tasks):
+            result = await future
+            results.append(result)
+            progress.update(sub, advance=1)
+    return results
 
 
 def dump_failed_result(results: dict, submissions: dict, file_path: str):
