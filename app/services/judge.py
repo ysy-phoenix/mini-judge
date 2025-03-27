@@ -1,6 +1,7 @@
 import asyncio
 import time
 
+from app.core.config import settings
 from app.models.schemas import (
     JudgeMode,
     JudgeResult,
@@ -10,7 +11,12 @@ from app.models.schemas import (
 )
 from app.services.compiler import compile_code
 from app.services.executor import execute_code
-from app.services.utils import MAX_TEST_CASE_RESULTS, STATUS_PRIORITY
+from app.services.utils import (
+    MAX_TEST_CASE_RESULTS,
+    STATUS_PRIORITY,
+    normalize_output,
+    truncate_output,
+)
 from app.utils.logger import logger
 from app.utils.security import (
     clean_execution_directory,
@@ -19,16 +25,9 @@ from app.utils.security import (
 )
 
 
-def truncate_output(output: str, max_length: int = 256) -> str:
-    if len(output) <= max_length:
-        return output
-    else:
-        return output[: max_length // 2] + "[... truncated ...]" + output[-max_length // 2 :]
-
-
 async def process_judge_task(submission: Submission) -> JudgeResult:
     r"""Process a judging task directly, without fetching data from Redis"""
-    if not is_code_safe(submission.code, submission.language):
+    if settings.SECURITY_CHECK and not is_code_safe(submission.code, submission.language):
         logger.error(
             f"Code contains potentially unsafe operations: [red]{submission.task_id}[/red]"
         )
@@ -41,7 +40,11 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
 
     try:
         executable_path_or_code, compile_error = await compile_code(
-            submission.code, submission.mode, submission.language, working_dir
+            submission.code,
+            submission.mode,
+            submission.language,
+            working_dir,
+            submission.entry_point,
         )
         if compile_error:
             logger.error(
@@ -58,7 +61,6 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                 test_case,
                 submission.time_limit,
                 submission.memory_limit,
-                working_dir,
             )
             for test_case in submission.test_cases
         ]
@@ -82,15 +84,10 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
         ):
             # Compare the output with expected output
             if result.status == JudgeStatus.ACCEPTED:
-                if submission.mode == JudgeMode.LEETCODE:
-                    if "Process returned code 1" in result.error:
-                        result.status = JudgeStatus.WRONG_ANSWER
-                    else:
-                        passed_cases += 1
-                else:
-                    normalized_output = _normalize_output(result.output)
-                    normalized_expected = _normalize_output(test_case.expected)
-                    result.error = (
+                if submission.mode == JudgeMode.ACM:
+                    normalized_output = normalize_output(result.actual_output)
+                    normalized_expected = normalize_output(test_case.expected)
+                    result.error_message = (
                         f"Expected:\n{normalized_expected[:100]}\n"
                         f"Actual:\n{normalized_output[:100]}"
                     )
@@ -99,6 +96,8 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                         result.status = JudgeStatus.WRONG_ANSWER
                     else:
                         passed_cases += 1
+                else:
+                    passed_cases += 1
 
             # Update stats
             max_execution_time = max(max_execution_time, result.execution_time)
@@ -120,9 +119,13 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                         status=result.status,
                         execution_time=result.execution_time,
                         memory_usage=result.memory_usage,
-                        error_message=truncate_output(result.error) if result.error else None,
+                        error_message=truncate_output(result.error_message)
+                        if result.error_message
+                        else None,
                         expected_output=truncate_output(str(test_case.expected)),
-                        actual_output=truncate_output(result.output),
+                        actual_output=truncate_output(result.actual_output)
+                        if result.actual_output
+                        else None,
                     )
                 )
 
@@ -163,16 +166,3 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
         # Clean up execution directory only if it was created
         if working_dir:
             clean_execution_directory(working_dir)
-
-
-def _normalize_output(output: str) -> str:
-    r"""Normalize output for comparison.
-    - Trim leading/trailing whitespace
-    - Normalize line endings
-    - Remove empty lines
-    """
-    # First remove trailing newlines explicitly
-    while output.endswith("\n"):
-        output = output[:-1]
-    lines = output.strip().replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    return "\n".join(line.strip() for line in lines if line.strip())

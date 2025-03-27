@@ -1,12 +1,17 @@
 import argparse
+import asyncio
 import json
 import time
-from multiprocessing import Pool
 
 from datasets import load_dataset
 from rich.console import Console
 
-from scripts.utils import EMPTY_TEST_CASES, dump_failed_result, judge, print_stress_test_summary
+from scripts.utils import (
+    EMPTY_TEST_CASES,
+    dump_failed_result,
+    print_stress_test_summary,
+    process_all_submissions,
+)
 
 LEETCODE_TIME_LIMIT = 30
 LEETCODE_MEMORY_LIMIT = 4 * 1024
@@ -53,8 +58,7 @@ def main():
             break
 
     benchmark_start = time.time()
-    with Pool(args.workers) as pool:
-        results = pool.map(judge, submissions.items())
+    results = asyncio.run(process_all_submissions(submissions))
     benchmark_end = time.time()
     total_time = benchmark_end - benchmark_start
 

@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Security settings
     ALLOWED_HOSTS: list[str] = ["*"]
+    SECURITY_CHECK: bool = False
 
     # Code execution
     CODE_EXECUTION_DIR: str = "/tmp/mini_judge"
@@ -34,7 +35,7 @@ class Settings(BaseSettings):
     # Worker settings
     MAX_WORKERS: int = multiprocessing.cpu_count()
     MAX_LATENCY: int = 180
-    MAX_TASK_EXECUTION_TIME: int = 60
+    MAX_TASK_EXECUTION_TIME: int = 150
     RESULT_EXPIRY_TIME: int = 3600
 
     # Manager settings
