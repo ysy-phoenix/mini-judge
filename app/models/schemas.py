@@ -65,3 +65,4 @@ class JudgeResult(BaseModel):
     error_message: str | None = None
     test_case_results: list[TestCaseResult] | None = None
     task_id: str | None = None
+    metadata: dict[str, Any] | None = None

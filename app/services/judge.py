@@ -150,6 +150,10 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
             test_case_results=test_case_results,
             task_id=submission.task_id,
             error_message=error_message,
+            metadata={
+                "passed": passed_cases,
+                "total": len(submission.test_cases),
+            },
         )
 
     except Exception as e:
