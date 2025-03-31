@@ -65,8 +65,8 @@ python scripts/warmup.py
 # check health
 curl http://localhost:8000/api/v1/health
 
-# check queue status
-curl http://localhost:8000/api/v1/health/queue
+# check detail status
+curl http://localhost:8000/api/v1/health/detail
 ```
 
 ### pytest
@@ -83,7 +83,7 @@ python scripts/taco.py --source codeforces --samples 8192
 # large samples for full dataset
 
 # Full Mode
-python scripts/leetcode.py --mode fullcode --samples 8192
+python scripts/leetcode.py --samples 8192
 ```
 
 Stress test results are available [here](docs/stress-test.md).

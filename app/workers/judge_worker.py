@@ -1,5 +1,10 @@
 import asyncio
+import shutil
+import signal
+import time
+from contextlib import asynccontextmanager
 from multiprocessing import Process
+from pathlib import Path
 
 from app.core.config import settings
 from app.models.schemas import JudgeResult, JudgeStatus, Submission
@@ -17,6 +22,9 @@ class JudgeWorker(Process):
         self.worker_id = worker_id
         self.daemon = True
         self.throttled = False
+        self.shutdown_event = asyncio.Event()
+        self.current_task: asyncio.Task | None = None
+        self.current_submission: Submission | None = None
 
     async def _process_task(self, submission: Submission):
         redis = await get_redis()
@@ -77,46 +85,139 @@ class JudgeWorker(Process):
 
         return False  # No throttling needed
 
+    async def _save_task_state(self):
+        """Save current task state to Redis for recovery"""
+        if self.current_submission:
+            redis = await get_redis()
+            state_key = f"{settings.REDIS_PREFIX}:worker:{self.worker_id}:state"
+
+            # Save task state
+            await redis.hset(
+                state_key,
+                mapping={
+                    "task_id": self.current_submission.task_id,
+                    "status": "interrupted",
+                    "timestamp": str(time.time()),
+                },
+            )
+
+            # Re-queue the submission if it wasn't completed
+            await redis.rpush(
+                settings.REDIS_SUBMISSION_QUEUE, self.current_submission.model_dump_json()
+            )
+
+            logger.info(f"Worker {self.worker_id} saved task: {self.current_submission.task_id}")
+
+    async def _cleanup_resources(self):
+        """Clean up any resources used by the worker"""
+        try:
+            # Clean up temporary files
+            worker_tmp_dir = Path(f"{settings.CODE_EXECUTION_DIR}/worker_{self.worker_id}")
+            if worker_tmp_dir.exists():
+                shutil.rmtree(worker_tmp_dir, ignore_errors=True)
+
+            # Clean up Redis keys
+            redis = await get_redis()
+            state_key = f"{settings.REDIS_PREFIX}:worker:{self.worker_id}:state"
+            await redis.delete(state_key)
+
+            # Additional cleanup as needed...
+
+        except Exception as e:
+            logger.error(f"Worker {self.worker_id} cleanup error: {str(e)}")
+
+    @asynccontextmanager
+    async def task_context(self, submission: Submission):
+        """Context manager for task execution with proper cleanup"""
+        self.current_submission = submission
+        try:
+            yield
+        finally:
+            self.current_submission = None
+
+    async def shutdown(self):
+        """Graceful shutdown handling"""
+        # Set shutdown event
+        self.shutdown_event.set()
+
+        # Handle current task
+        if self.current_task and not self.current_task.done():
+            try:
+                # Wait for current task to complete
+                await asyncio.wait_for(self.current_task, timeout=settings.TASK_COMPLETION_TIMEOUT)
+            except asyncio.TimeoutError:
+                logger.warning(f"Worker {self.worker_id} timeout waiting for task completion")
+                # Save task state for recovery
+                await self._save_task_state()
+
+                # Cancel the task
+                self.current_task.cancel()
+                try:
+                    await self.current_task
+                except asyncio.CancelledError:
+                    pass
+            except Exception as e:
+                logger.error(f"Worker {self.worker_id} error during task completion: {str(e)}")
+
+        # Cleanup phase
+        try:
+            await asyncio.wait_for(
+                self._cleanup_resources(), timeout=settings.SHUTDOWN_CLEANUP_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Worker {self.worker_id} cleanup timeout")
+        except Exception as e:
+            logger.error(f"Worker {self.worker_id} cleanup error: {str(e)}")
+
     async def _run_async_loop(self):
-        r"""Async event loop for the worker."""
+        """Enhanced async event loop with shutdown handling"""
         redis = await get_redis()
 
-        while True:
+        while not self.shutdown_event.is_set():
             try:
-                # Check resource utilization before processing
-                if await self._check_and_handle_resource_throttling(redis):
-                    continue  # Skip to next iteration if we're throttling
+                # Use shorter timeout during shutdown
+                timeout = 1 if self.shutdown_event.is_set() else None
 
-                # Block until we get a task, with a timeout so we can check resources periodically
-                result = await redis.blpop(
-                    settings.REDIS_SUBMISSION_QUEUE, timeout=settings.RESOURCE_CHECK_INTERVAL
-                )
+                # Get task with timeout
+                result = await redis.blpop(settings.REDIS_SUBMISSION_QUEUE, timeout=timeout)
 
                 if result is None:
-                    # No task available or timeout, loop and check resources again
                     continue
 
                 _, data = result
                 await redis.incr(settings.REDIS_FETCHED_COUNT)
                 submission = Submission.model_validate_json(data)
-                await self._process_task(submission)
+
+                # Process task with context manager
+                async with self.task_context(submission):
+                    self.current_task = asyncio.create_task(self._process_task(submission))
+                    await self.current_task
+
             except Exception as e:
-                logger.error(f"Worker {self.worker_id} loop error: [red]{str(e)}[/red]")
-                # Sleep to avoid tight error loops
+                logger.error(f"Worker {self.worker_id} loop error: {str(e)}")
                 await asyncio.sleep(1)
 
     def run(self):
-        r"""Main process entry point."""
-        # Create a new event loop for this process
+        """Enhanced main process entry point with signal handling"""
+        # Set up signal handlers
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        # Run the async loop
+        def handle_shutdown_signal(signum, frame):
+            # Schedule shutdown in event loop
+            loop.call_soon_threadsafe(lambda: asyncio.create_task(self.shutdown()))
+
+        # Register signal handlers
+        signal.signal(signal.SIGTERM, handle_shutdown_signal)
+        signal.signal(signal.SIGINT, handle_shutdown_signal)
+
         try:
             loop.run_until_complete(self._run_async_loop())
         except KeyboardInterrupt:
-            pass
+            logger.info(f"Worker {self.worker_id} received keyboard interrupt")
         finally:
+            # Ensure shutdown is called
+            loop.run_until_complete(self.shutdown())
             loop.close()
 
 

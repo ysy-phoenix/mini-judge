@@ -266,7 +266,4 @@ class WorkerManager:
         for worker in self.workers:
             if worker.is_alive():
                 worker.terminate()
-
-        # Wait for all workers to terminate
-        for worker in self.workers:
-            worker.join(timeout=5)
+        logger.info("All workers terminated")
