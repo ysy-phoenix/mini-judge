@@ -6,6 +6,7 @@ from app.models.schemas import JudgeResult, JudgeStatus, Submission
 from app.services.judge import process_judge_task
 from app.utils.logger import logger
 from app.utils.redis import get_redis
+from app.utils.resource_monitor import ResourceMonitor
 
 
 class JudgeWorker(Process):
@@ -15,6 +16,7 @@ class JudgeWorker(Process):
         super().__init__(name=f"judge-worker-{worker_id}")
         self.worker_id = worker_id
         self.daemon = True
+        self.throttled = False
 
     async def _process_task(self, submission: Submission):
         redis = await get_redis()
@@ -51,14 +53,50 @@ class JudgeWorker(Process):
                 error_result.model_dump_json(),
             )
 
+    async def _check_and_handle_resource_throttling(self, redis):
+        """Check and handle resource throttling based on system load."""
+        # If we're already throttled, check if we can resume
+        if self.throttled:
+            if ResourceMonitor.can_resume():
+                logger.info(
+                    f"Worker {self.worker_id} resuming task processing as system load is now normal"
+                )
+                self.throttled = False
+            else:
+                # Still in high load, sleep and check again later
+                await asyncio.sleep(settings.RESOURCE_CHECK_INTERVAL)
+                return True  # Keep throttling
+        # Otherwise, check if we need to start throttling
+        elif ResourceMonitor.should_throttle():
+            logger.warning(
+                f"Worker {self.worker_id} throttling task processing due to high system load"
+            )
+            self.throttled = True
+            await asyncio.sleep(settings.RESOURCE_CHECK_INTERVAL)
+            return True  # Start throttling
+
+        return False  # No throttling needed
+
     async def _run_async_loop(self):
         r"""Async event loop for the worker."""
         redis = await get_redis()
 
         while True:
             try:
-                # Block until we get a task
-                _, data = await redis.blpop(settings.REDIS_SUBMISSION_QUEUE)
+                # Check resource utilization before processing
+                if await self._check_and_handle_resource_throttling(redis):
+                    continue  # Skip to next iteration if we're throttling
+
+                # Block until we get a task, with a timeout so we can check resources periodically
+                result = await redis.blpop(
+                    settings.REDIS_SUBMISSION_QUEUE, timeout=settings.RESOURCE_CHECK_INTERVAL
+                )
+
+                if result is None:
+                    # No task available or timeout, loop and check resources again
+                    continue
+
+                _, data = result
                 await redis.incr(settings.REDIS_FETCHED_COUNT)
                 submission = Submission.model_validate_json(data)
                 await self._process_task(submission)

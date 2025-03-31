@@ -46,7 +46,7 @@ uv pip install -e .
 install redis
 
 ```bash
-sudo apt update && sudo apt install redis-server
+sudo apt update && sudo apt install redis-server -y
 redis-server --daemonize yes
 ```
 

@@ -27,7 +27,7 @@ class Settings(BaseSettings):
 
     # Security settings
     ALLOWED_HOSTS: list[str] = ["*"]
-    SECURITY_CHECK: bool = False
+    SECURITY_CHECK: bool = True
 
     # Code execution
     CODE_EXECUTION_DIR: str = "/tmp/mini_judge"
@@ -40,8 +40,13 @@ class Settings(BaseSettings):
 
     # Manager settings
     MONITOR_INTERVAL: int = 10
-    RECOVER_INTERVAL: int = 1
+    RECOVER_INTERVAL: float = 0.2
     CLEANUP_INTERVAL: int = 900
+
+    # Resource limits
+    MEMORY_HIGH_THRESHOLD: float = 85.0  # 85% memory utilization
+    MEMORY_LOW_THRESHOLD: float = 75.0  # 75% memory utilization
+    RESOURCE_CHECK_INTERVAL: int = 1  # seconds
 
     model_config = {"env_file": ".env"}
 
