@@ -1,7 +1,6 @@
 import asyncio
 import shutil
 import signal
-import time
 from contextlib import asynccontextmanager
 from multiprocessing import Process
 from pathlib import Path
@@ -62,7 +61,7 @@ class JudgeWorker(Process):
             )
 
     async def _check_and_handle_resource_throttling(self, redis):
-        """Check and handle resource throttling based on system load."""
+        r"""Check and handle resource throttling based on system load."""
         # If we're already throttled, check if we can resume
         if self.throttled:
             if ResourceMonitor.can_resume():
@@ -85,31 +84,8 @@ class JudgeWorker(Process):
 
         return False  # No throttling needed
 
-    async def _save_task_state(self):
-        """Save current task state to Redis for recovery"""
-        if self.current_submission:
-            redis = await get_redis()
-            state_key = f"{settings.REDIS_PREFIX}:worker:{self.worker_id}:state"
-
-            # Save task state
-            await redis.hset(
-                state_key,
-                mapping={
-                    "task_id": self.current_submission.task_id,
-                    "status": "interrupted",
-                    "timestamp": str(time.time()),
-                },
-            )
-
-            # Re-queue the submission if it wasn't completed
-            await redis.rpush(
-                settings.REDIS_SUBMISSION_QUEUE, self.current_submission.model_dump_json()
-            )
-
-            logger.info(f"Worker {self.worker_id} saved task: {self.current_submission.task_id}")
-
     async def _cleanup_resources(self):
-        """Clean up any resources used by the worker"""
+        r"""Clean up any resources used by the worker"""
         try:
             # Clean up temporary files
             worker_tmp_dir = Path(f"{settings.CODE_EXECUTION_DIR}/worker_{self.worker_id}")
@@ -121,14 +97,32 @@ class JudgeWorker(Process):
             state_key = f"{settings.REDIS_PREFIX}:worker:{self.worker_id}:state"
             await redis.delete(state_key)
 
-            # Additional cleanup as needed...
+            # Clear any other worker-specific data
+            if self.current_submission:
+                task_key = f"{settings.REDIS_PREFIX}task:{self.current_submission.task_id}"
+                # Only clear if it's still in RUNNING state (not completed)
+                task_status = await redis.hget(task_key, "status")
+                if task_status and task_status.decode() == JudgeStatus.RUNNING:
+                    # Mark as system error instead of leaving in running state
+                    await redis.hset(task_key, "status", JudgeStatus.SYSTEM_ERROR)
+
+                    # Add error result to ensure client gets a response
+                    error_result = JudgeResult(
+                        status=JudgeStatus.SYSTEM_ERROR,
+                        error_message="Task discarded during system shutdown",
+                        task_id=self.current_submission.task_id,
+                    )
+                    await redis.rpush(
+                        f"{settings.REDIS_RESULT_QUEUE}:{self.current_submission.task_id}",
+                        error_result.model_dump_json(),
+                    )
 
         except Exception as e:
             logger.error(f"Worker {self.worker_id} cleanup error: {str(e)}")
 
     @asynccontextmanager
     async def task_context(self, submission: Submission):
-        """Context manager for task execution with proper cleanup"""
+        r"""Context manager for task execution with proper cleanup"""
         self.current_submission = submission
         try:
             yield
@@ -136,7 +130,7 @@ class JudgeWorker(Process):
             self.current_submission = None
 
     async def shutdown(self):
-        """Graceful shutdown handling"""
+        r"""Graceful shutdown handling"""
         # Set shutdown event
         self.shutdown_event.set()
 
@@ -146,11 +140,11 @@ class JudgeWorker(Process):
                 # Wait for current task to complete
                 await asyncio.wait_for(self.current_task, timeout=settings.TASK_COMPLETION_TIMEOUT)
             except asyncio.TimeoutError:
-                logger.warning(f"Worker {self.worker_id} timeout waiting for task completion")
-                # Save task state for recovery
-                await self._save_task_state()
+                logger.warning(
+                    f"Worker {self.worker_id} timeout waiting for task completion - discarding task"
+                )
 
-                # Cancel the task
+                # Cancel the task without saving state
                 self.current_task.cancel()
                 try:
                     await self.current_task
@@ -170,7 +164,7 @@ class JudgeWorker(Process):
             logger.error(f"Worker {self.worker_id} cleanup error: {str(e)}")
 
     async def _run_async_loop(self):
-        """Enhanced async event loop with shutdown handling"""
+        r"""Enhanced async event loop with shutdown handling"""
         redis = await get_redis()
 
         while not self.shutdown_event.is_set():
@@ -198,7 +192,7 @@ class JudgeWorker(Process):
                 await asyncio.sleep(1)
 
     def run(self):
-        """Enhanced main process entry point with signal handling"""
+        r"""Enhanced main process entry point with signal handling"""
         # Set up signal handlers
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

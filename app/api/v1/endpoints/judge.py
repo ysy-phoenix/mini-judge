@@ -13,6 +13,10 @@ router = APIRouter()
 @router.post("", response_model=JudgeResult)
 async def create_judge_task(submission: Submission) -> JudgeResult:
     r"""Submit code for judging and wait for the result."""
+    failed_metadata = {
+        "passed": 0,
+        "total": len(submission.test_cases),
+    }
     try:
         redis = await get_redis()
 
@@ -52,24 +56,30 @@ async def create_judge_task(submission: Submission) -> JudgeResult:
 
             if task_status == JudgeStatus.PENDING:
                 # Task still pending
+                logger.warning(f"Judge timeout after {timeout} seconds. Task still pending.")
                 return JudgeResult(
                     status=JudgeStatus.SYSTEM_ERROR,
                     error_message=f"Judge timeout after {timeout} seconds. Task still pending.",
                     task_id=submission.task_id,
+                    metadata=failed_metadata,
                 )
             elif task_status is None:
                 # Task information expired or not found
+                logger.warning(f"Task information not found. Task ID: {submission.task_id}")
                 return JudgeResult(
                     status=JudgeStatus.SYSTEM_ERROR,
                     error_message="Task information not found.",
                     task_id=submission.task_id,
+                    metadata=failed_metadata,
                 )
             else:
                 # Task has status but result is lost
+                logger.warning(f"Task was in status {task_status} but no result was available.")
                 return JudgeResult(
                     status=JudgeStatus.SYSTEM_ERROR,
                     error_message=f"Task was in status {task_status} but no result was available.",
                     task_id=submission.task_id,
+                    metadata=failed_metadata,
                 )
 
         # Normal case, unpack result
@@ -78,7 +88,10 @@ async def create_judge_task(submission: Submission) -> JudgeResult:
     except Exception as e:
         logger.error(f"Error popping result from Redis: {str(e)}")
         return JudgeResult(
-            status=JudgeStatus.SYSTEM_ERROR, error_message=str(e), task_id=submission.task_id
+            status=JudgeStatus.SYSTEM_ERROR,
+            error_message=str(e),
+            task_id=submission.task_id,
+            metadata=failed_metadata,
         )
 
     try:
