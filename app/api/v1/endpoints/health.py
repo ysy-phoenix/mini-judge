@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from app.core.config import settings
 from app.utils.redis import get_redis
-from app.utils.resource_monitor import ResourceMonitor
 
 router = APIRouter()
 
@@ -35,8 +34,6 @@ async def detail():
         queue_length = await redis.llen(settings.REDIS_SUBMISSION_QUEUE)
         processed = int(await redis.get(settings.REDIS_PROCESSED_COUNT) or 0)
         submitted = int(await redis.get(settings.REDIS_SUBMITTED_COUNT) or 0)
-        cpu_usage = ResourceMonitor.get_cpu_usage()
-        memory_usage = ResourceMonitor.get_memory_usage()
 
         return {
             "status": "ok",
@@ -44,10 +41,6 @@ async def detail():
             "processed_tasks": processed,
             "submitted_tasks": submitted,
             "backlog": submitted - processed,
-            "system": {
-                "cpu_usage": cpu_usage,
-                "memory_usage": memory_usage,
-            },
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}

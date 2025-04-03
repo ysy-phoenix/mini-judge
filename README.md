@@ -69,6 +69,13 @@ curl http://localhost:8000/api/v1/health
 curl http://localhost:8000/api/v1/health/detail
 ```
 
+### Useful commands
+
+```bash
+# kill all judge processes
+ps aux | grep -v grep | grep 'judge' | awk '{print $2}' | xargs kill -9
+```
+
 ### pytest
 
 ```bash

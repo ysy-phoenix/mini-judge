@@ -43,17 +43,6 @@ class Settings(BaseSettings):
     RECOVER_INTERVAL: float = 0.2
     CLEANUP_INTERVAL: int = 900
 
-    # Resource limits
-    MEMORY_HIGH_THRESHOLD: float = 85.0  # 85% memory utilization
-    MEMORY_LOW_THRESHOLD: float = 75.0  # 75% memory utilization
-    RESOURCE_CHECK_INTERVAL: int = 1  # seconds
-
-    # Shutdown settings
-    SHUTDOWN_TIMEOUT: int = 30  # Maximum seconds to wait for graceful shutdown
-    SHUTDOWN_CLEANUP_TIMEOUT: int = 5  # Maximum seconds to wait for cleanup operations
-    TASK_COMPLETION_TIMEOUT: int = 10  # Maximum seconds to wait for current task
-    SHUTDOWN_SIGNAL_DELAY: float = 0.1  # Delay between shutdown signals
-
     model_config = {"env_file": ".env"}
 
 
