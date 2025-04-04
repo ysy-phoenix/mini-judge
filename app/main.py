@@ -1,5 +1,6 @@
 import os
 import signal
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -12,34 +13,36 @@ from app.utils.redis import get_redis
 from app.workers.manager import WorkerManager
 
 # Global worker manager reference
-_worker_manager = None
+manager = None
 
 
-# Simple force exit handler
-def force_exit(signum, frame):
-    # Force immediate exit without any cleanup
-    os._exit(0)
-
-
-# Register force exit handlers
-signal.signal(signal.SIGINT, force_exit)
-signal.signal(signal.SIGTERM, force_exit)
+def handle_signal(signum, frame):
+    """Handle termination signals."""
+    logger.info(f"Received signal {signal.Signals(signum).name}. Initiating shutdown...")
+    if manager.running:
+        manager.shutdown()
+    sys.exit(0)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _worker_manager
-    logger.info("Application starting")
-
-    # Initialize Redis
-    _ = await get_redis()
+    """Application lifespan manager with fast startup and shutdown."""
+    global manager
+    signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGTERM, handle_signal)
 
     # Initialize worker manager
-    _worker_manager = WorkerManager()
+    manager = WorkerManager()
+    manager.start()
+    redis = await get_redis()
+    await redis.flushall()
 
     try:
         yield
+    except Exception as e:
+        logger.error(f"Application error: {str(e)}")
     finally:
+        logger.info("Finishing application...")
         os._exit(0)
 
 

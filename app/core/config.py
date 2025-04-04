@@ -14,7 +14,6 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     REDIS_PREFIX: str = "mini_judge"
     REDIS_SUBMISSION_QUEUE: str = f"{REDIS_PREFIX}:queue:submissions"
-    REDIS_RESULT_QUEUE: str = f"{REDIS_PREFIX}:queue:results"
     REDIS_PROCESSED_COUNT: str = f"{REDIS_PREFIX}:processed_count"
     REDIS_SUBMITTED_COUNT: str = f"{REDIS_PREFIX}:submitted_count"
     REDIS_FETCHED_COUNT: str = f"{REDIS_PREFIX}:fetched_count"

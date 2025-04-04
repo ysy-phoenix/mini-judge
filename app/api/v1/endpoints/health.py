@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 
-from app.core.config import settings
-from app.utils.redis import get_redis
+from app.utils.redis import RedisManager, RedisQueue, get_redis
 
 router = APIRouter()
 
@@ -29,11 +28,9 @@ async def redis_health_check():
 async def detail():
     r"""Get submission queue status."""
     try:
-        redis = await get_redis()
-
-        queue_length = await redis.llen(settings.REDIS_SUBMISSION_QUEUE)
-        processed = int(await redis.get(settings.REDIS_PROCESSED_COUNT) or 0)
-        submitted = int(await redis.get(settings.REDIS_SUBMITTED_COUNT) or 0)
+        queue_length = await RedisManager.length(RedisQueue.SUBMISSIONS)
+        processed = int(await RedisManager.get(RedisQueue.PROCESSED) or 0)
+        submitted = int(await RedisManager.get(RedisQueue.SUBMITTED) or 0)
 
         return {
             "status": "ok",
