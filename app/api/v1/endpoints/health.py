@@ -1,8 +1,6 @@
 from fastapi import APIRouter
 
-from app.core.config import settings
-from app.utils.redis import get_redis
-from app.utils.resource_monitor import ResourceMonitor
+from app.utils.redis import RedisManager, RedisQueue, get_redis
 
 router = APIRouter()
 
@@ -30,24 +28,22 @@ async def redis_health_check():
 async def detail():
     r"""Get submission queue status."""
     try:
-        redis = await get_redis()
-
-        queue_length = await redis.llen(settings.REDIS_SUBMISSION_QUEUE)
-        processed = int(await redis.get(settings.REDIS_PROCESSED_COUNT) or 0)
-        submitted = int(await redis.get(settings.REDIS_SUBMITTED_COUNT) or 0)
-        cpu_usage = ResourceMonitor.get_cpu_usage()
-        memory_usage = ResourceMonitor.get_memory_usage()
+        submissions_length = await RedisManager.length(RedisQueue.SUBMISSIONS)
+        tasks_length = await RedisManager.count(RedisQueue.TASKS)
+        results_length = await RedisManager.count(RedisQueue.RESULTS)
+        submitted = int(await RedisManager.get(RedisQueue.SUBMITTED) or 0)
+        fetched = int(await RedisManager.get(RedisQueue.FETCHED) or 0)
+        processed = int(await RedisManager.get(RedisQueue.PROCESSED) or 0)
 
         return {
             "status": "ok",
-            "queue_length": queue_length,
-            "processed_tasks": processed,
+            "submissions_length": submissions_length,
+            "tasks_length": tasks_length,
+            "results_length": results_length,
             "submitted_tasks": submitted,
+            "fetched_tasks": fetched,
+            "processed_tasks": processed,
             "backlog": submitted - processed,
-            "system": {
-                "cpu_usage": cpu_usage,
-                "memory_usage": memory_usage,
-            },
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}

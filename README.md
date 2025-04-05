@@ -43,15 +43,15 @@ uv pip install -r requirements.txt
 uv pip install -e .
 ```
 
+> [!Note]
+> [uv](https://github.com/astral-sh/uv) is a fast Python package installer and resolver.
+
 install redis
 
 ```bash
 sudo apt update && sudo apt install redis-server -y
 redis-server --daemonize yes
 ```
-
-> [!Note]
-> [uv](https://github.com/astral-sh/uv) is a fast Python package installer and resolver.
 
 ## 🚀 Quick Start
 
@@ -67,6 +67,13 @@ curl http://localhost:8000/api/v1/health
 
 # check detail status
 curl http://localhost:8000/api/v1/health/detail
+```
+
+### Useful commands
+
+```bash
+# kill all judge processes
+ps aux | grep -v grep | grep 'judge' | awk '{print $2}' | xargs kill -9
 ```
 
 ### pytest
