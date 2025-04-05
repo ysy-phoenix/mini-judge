@@ -29,14 +29,16 @@ async def detail():
     r"""Get submission queue status."""
     try:
         queue_length = await RedisManager.length(RedisQueue.SUBMISSIONS)
-        processed = int(await RedisManager.get(RedisQueue.PROCESSED) or 0)
         submitted = int(await RedisManager.get(RedisQueue.SUBMITTED) or 0)
+        fetched = int(await RedisManager.get(RedisQueue.FETCHED) or 0)
+        processed = int(await RedisManager.get(RedisQueue.PROCESSED) or 0)
 
         return {
             "status": "ok",
             "queue_length": queue_length,
-            "processed_tasks": processed,
             "submitted_tasks": submitted,
+            "fetched_tasks": fetched,
+            "processed_tasks": processed,
             "backlog": submitted - processed,
         }
     except Exception as e:
