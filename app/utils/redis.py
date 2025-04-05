@@ -15,7 +15,6 @@ _local = threading.local()
 class RedisQueue(Enum):
     SUBMISSIONS = "submissions"
     RESULTS = "results"
-    WORKERS = "workers"
     TASKS = "tasks"
     PROCESSED = "processed"
     SUBMITTED = "submitted"

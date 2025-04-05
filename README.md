@@ -43,15 +43,15 @@ uv pip install -r requirements.txt
 uv pip install -e .
 ```
 
+> [!Note]
+> [uv](https://github.com/astral-sh/uv) is a fast Python package installer and resolver.
+
 install redis
 
 ```bash
 sudo apt update && sudo apt install redis-server -y
 redis-server --daemonize yes
 ```
-
-> [!Note]
-> [uv](https://github.com/astral-sh/uv) is a fast Python package installer and resolver.
 
 ## 🚀 Quick Start
 

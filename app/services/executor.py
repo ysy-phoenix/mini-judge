@@ -2,6 +2,8 @@ import asyncio
 import time
 from collections.abc import Callable
 
+import psutil
+
 from app.core.config import settings
 from app.models.schemas import JudgeMode, JudgeStatus, JudgeTestCase, Language, TestCaseResult
 from app.services.leetcode import judge_leetcode
@@ -34,10 +36,10 @@ async def execute_code(
     else:  # C or C++
         # For compiled languages, use the executable path
         cmd = [executable_path_or_code]
-    return await _execute_with_limits(cmd, input_data, time_limit_sec, memory_limit_bytes)
+    return await execute_with_limits(cmd, input_data, time_limit_sec, memory_limit_bytes)
 
 
-async def _execute_with_limits(
+async def execute_with_limits(
     cmd: list[str], input_data: str, time_limit_sec: float, memory_limit_bytes: int
 ) -> TestCaseResult:
     r"""Execute a command with resource constraints."""
@@ -70,6 +72,7 @@ async def _execute_with_limits(
             stop_event.set()
             memory_usage = await memory_task
 
+            status = JudgeStatus.ACCEPTED
             stdout_str = stdout.decode("utf-8", errors="replace").strip()
             stderr_str = stderr.decode("utf-8", errors="replace").strip()
 
@@ -83,16 +86,9 @@ async def _execute_with_limits(
                 else:
                     status = JudgeStatus.RUNTIME_ERROR
                 stderr_str = f"Process return code {process.returncode}\n{stderr_str}"
-                return TestCaseResult(
-                    status=status,
-                    execution_time=execution_time,
-                    memory_usage=memory_usage,
-                    actual_output=stdout_str,
-                    error_message=stderr_str,
-                )
 
             return TestCaseResult(
-                status=JudgeStatus.ACCEPTED,  # This will be compared against expected output later
+                status=status,
                 execution_time=execution_time,
                 memory_usage=memory_usage,
                 actual_output=stdout_str,
@@ -105,9 +101,11 @@ async def _execute_with_limits(
             memory_usage = await memory_task
 
             try:
+                for child in psutil.Process(process.pid).children(recursive=True):
+                    child.kill()
                 process.kill()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Error killing process: {e}")
 
             return TestCaseResult(
                 status=JudgeStatus.TIME_LIMIT_EXCEEDED,
