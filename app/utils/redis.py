@@ -51,14 +51,18 @@ class RedisManager:
     r"""Redis key name manager, for managing key name formats."""
 
     @staticmethod
-    def queue(name: str, key: str = None) -> str:
+    def queue(queue: RedisQueue, key: str = None) -> str:
         r"""Get the queue key name."""
-        return f"{settings.REDIS_PREFIX}:{name}:{key}" if key else f"{settings.REDIS_PREFIX}:{name}"
+        return (
+            f"{settings.REDIS_PREFIX}:{queue.value}:{key}"
+            if key
+            else f"{settings.REDIS_PREFIX}:{queue.value}"
+        )
 
     @staticmethod
-    def pattern(name: str) -> str:
+    def pattern(queue: RedisQueue) -> str:
         r"""Get the pattern for all task keys."""
-        return f"{settings.REDIS_PREFIX}:{name}:*"
+        return f"{settings.REDIS_PREFIX}:{queue.value}:*"
 
     @staticmethod
     async def get_hash_fields(key: str, fields: list[str] = None) -> dict[str, Any]:
@@ -114,7 +118,7 @@ class RedisManager:
     async def keys(queue: RedisQueue) -> list[str]:
         r"""Get all keys that match a pattern."""
         redis = await get_redis()
-        return await redis.keys(RedisManager.pattern(queue.value))
+        return await redis.keys(RedisManager.pattern(queue))
 
     @staticmethod
     async def scan(cursor: int, match: str, count: int = 1000) -> tuple[int, list[str]]:
@@ -162,3 +166,21 @@ class RedisManager:
         return await redis.blpop(
             queue.value if isinstance(queue, RedisQueue) else queue, timeout=timeout
         )
+
+    @staticmethod
+    async def count(queue: RedisQueue, batch_size: int = 1000) -> int:
+        r"""Count the number of keys that match a pattern."""
+        pattern = RedisManager.pattern(queue)
+        cursor = total = 0
+        try:
+            while True:
+                cursor, keys = await RedisManager.scan(cursor, match=pattern, count=batch_size)
+                total += len(keys)
+
+                if cursor == 0:
+                    break
+
+            return total
+        except Exception as e:
+            logger.error(f"Key count failed for pattern '{pattern}': {str(e)}")
+            return 0

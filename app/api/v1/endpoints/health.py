@@ -28,14 +28,18 @@ async def redis_health_check():
 async def detail():
     r"""Get submission queue status."""
     try:
-        queue_length = await RedisManager.length(RedisQueue.SUBMISSIONS)
+        submissions_length = await RedisManager.length(RedisQueue.SUBMISSIONS)
+        tasks_length = await RedisManager.count(RedisQueue.TASKS)
+        results_length = await RedisManager.count(RedisQueue.RESULTS)
         submitted = int(await RedisManager.get(RedisQueue.SUBMITTED) or 0)
         fetched = int(await RedisManager.get(RedisQueue.FETCHED) or 0)
         processed = int(await RedisManager.get(RedisQueue.PROCESSED) or 0)
 
         return {
             "status": "ok",
-            "queue_length": queue_length,
+            "submissions_length": submissions_length,
+            "tasks_length": tasks_length,
+            "results_length": results_length,
             "submitted_tasks": submitted,
             "fetched_tasks": fetched,
             "processed_tasks": processed,
