@@ -34,6 +34,8 @@ def normalize_output(output: str) -> str:
 
 
 def truncate_output(output: str, max_length: int = 256) -> str:
+    if output is None:
+        return None
     if len(output) <= max_length:
         return output
     else:
@@ -41,7 +43,7 @@ def truncate_output(output: str, max_length: int = 256) -> str:
 
 
 async def monitor_process_memory(pid: int, stop_event: asyncio.Event) -> int:
-    """Monitor process memory usage periodically until stop_event is set."""
+    r"""Monitor process memory usage periodically until stop_event is set."""
     max_memory = 0
     try:
         process = psutil.Process(pid)

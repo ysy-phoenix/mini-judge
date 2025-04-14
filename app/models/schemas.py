@@ -15,6 +15,7 @@ class JudgeMode(str, Enum):
     LEETCODE = "leetcode"
     ACM = "acm"
     FULLCODE = "fullcode"
+    EXECUTION = "execution"
 
 
 class JudgeStatus(str, Enum):

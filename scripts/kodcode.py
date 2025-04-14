@@ -4,7 +4,6 @@ import asyncio
 import json
 import os
 import time
-from collections import Counter
 
 from datasets import load_dataset
 from rich.console import Console

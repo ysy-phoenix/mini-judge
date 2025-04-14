@@ -8,6 +8,35 @@ EMPTY_TEST_CASES = [
 
 
 @pytest.mark.asyncio
+async def test_execution_mode_accepted(async_client, api_base_url):
+    r"""Test Execution mode with correct code - should pass all test cases."""
+    test_code = """
+def add(a, b):
+    return a + b
+
+a, b = map(int, input().split())
+print(add(a, b))
+    """
+
+    submission = {
+        "code": test_code,
+        "language": Language.PYTHON.value,
+        "mode": JudgeMode.EXECUTION.value,
+        "test_cases": [{"input": "1 2", "expected": "3"}, {"input": "0 0", "expected": "0"}],
+        "time_limit": 1,
+        "memory_limit": 256,
+    }
+
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == JudgeStatus.ACCEPTED
+    assert data["test_case_results"][0]["actual_output"] == "3"
+    assert data["test_case_results"][1]["actual_output"] == "0"
+
+
+@pytest.mark.asyncio
 async def test_acm_mode_accepted(async_client, api_base_url):
     r"""Test ACM mode with correct code - should pass all test cases."""
     test_code = """

@@ -109,11 +109,15 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                 if STATUS_PRIORITY.get(result.status, 0) < STATUS_PRIORITY.get(overall_status, 7):
                     overall_status = result.status
 
-            # FIXME: Add 3 false test case results
             if (
                 result.status != JudgeStatus.ACCEPTED
                 and len(test_case_results) < MAX_TEST_CASE_RESULTS
-            ):
+            ) or (submission.mode == JudgeMode.EXECUTION):
+                actual_output = (
+                    truncate_output(result.actual_output)
+                    if submission.mode != JudgeMode.EXECUTION
+                    else result.actual_output
+                )
                 test_case_results.append(
                     TestCaseResult(
                         status=result.status,
@@ -123,9 +127,7 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                         if result.error_message
                         else None,
                         expected_output=truncate_output(str(test_case.expected)),
-                        actual_output=truncate_output(result.actual_output)
-                        if result.actual_output
-                        else None,
+                        actual_output=actual_output,
                     )
                 )
 
