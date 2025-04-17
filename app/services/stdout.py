@@ -1,187 +1,194 @@
+from functools import singledispatch
 from typing import Any
 
 import numpy as np
 
 
-def stripped_string_compare(s1: str, s2: str) -> bool:
-    s1 = s1.lstrip().rstrip()
-    s2 = s2.lstrip().rstrip()
-    is_equal = s1 == s2
-    if is_equal:
-        return True
-
-    # Edge case: Check if s1 and s2 are floats.
+def is_numeric(value: str) -> bool:
+    r"""Check if a string can be converted to a float."""
     try:
-        s1_float = float(s1)
-        s2_float = float(s2)
-        is_equal = np.isclose(s1_float, s2_float)
-        return is_equal
-    except Exception:
-        pass
-
-    # Edge case: Check if s1 and s2 rows are equal.
-    s1_list = s1.split("\n")
-    s2_list = s2.split("\n")
-    s1_list = [s.lstrip().rstrip() for s in s1_list]
-    s2_list = [s.lstrip().rstrip() for s in s2_list]
-
-    s1_list = [s for s in s1_list if s]
-    s2_list = [s for s in s2_list if s]
-    if len(s1_list) != len(s2_list):
+        float(value)
+        return True
+    except (ValueError, TypeError):
         return False
 
-    for s1, s2 in zip(s1_list, s2_list, strict=False):
-        sub_s1_list = s1.split()
-        sub_s2_list = s2.split()
-        sub_s1_list = [s.lstrip().rstrip() for s in sub_s1_list]
-        sub_s2_list = [s.lstrip().rstrip() for s in sub_s2_list]
-        sub_s1_list = [s for s in sub_s1_list if s]
-        sub_s2_list = [s for s in sub_s2_list if s]
-        if len(sub_s1_list) != len(sub_s2_list):
+
+def floats_equal(v1: str | float, v2: str | float, rtol: float = 1e-5, atol: float = 1e-8) -> bool:
+    r"""Compare two values as floats with tolerance."""
+    try:
+        return np.isclose(float(v1), float(v2), rtol=rtol, atol=atol)
+    except (ValueError, TypeError):
+        return False
+
+
+def normalize_string(s: str) -> str:
+    r"""Normalize a string by stripping whitespace and handling empty lines."""
+    return "\n".join(line.strip() for line in s.split("\n") if line.strip())
+
+
+def tokenize_string(s: str) -> list[list[str]]:
+    r"""Split a string into a nested list of tokens (by line and then by word)."""
+    return [line.split() for line in normalize_string(s).split("\n")]
+
+
+def compare_tokenized(tokens1: list[list[str]], tokens2: list[list[str]]) -> bool:
+    r"""Compare two tokenized string representations."""
+    if len(tokens1) != len(tokens2):
+        return False
+
+    for line1, line2 in zip(tokens1, tokens2, strict=False):
+        if len(line1) != len(line2):
             return False
-        for sub_s1, sub_s2 in zip(sub_s1_list, sub_s2_list, strict=False):
-            if sub_s1 != sub_s2:
-                # If they are floats...
-                try:
-                    sub_s1_float = float(sub_s1)
-                    sub_s2_float = float(sub_s2)
-                    if not np.isclose(sub_s1_float, sub_s2_float):
-                        return False
-                except Exception:
-                    pass
+
+        for t1, t2 in zip(line1, line2, strict=False):
+            if t1 == t2:
+                continue
+            if is_numeric(t1) and is_numeric(t2) and floats_equal(t1, t2):
+                continue
+            return False
+
     return True
 
 
-def check_equal(stdout: Any, expected: Any, debug: bool = False) -> bool:
-    if stripped_string_compare(str(stdout), str(expected)):
-        return True
-
-    if isinstance(stdout, list):
-        output_1 = "\n".join(stdout)
-        if stripped_string_compare(output_1, expected):
+def compare_as_sets(tokens1: list[list[str]], tokens2: list[list[str]]) -> bool:
+    r"""Compare tokenized strings as sets of words and as sets of numbers."""
+    try:
+        # Compare as sets of strings
+        set1 = {frozenset(line) for line in tokens1}
+        set2 = {frozenset(line) for line in tokens2}
+        if set1 == set2:
             return True
 
-    if isinstance(stdout, list):
-        output_2 = [o.lstrip().rstrip() for o in stdout]
-        output_2 = "\n".join(output_2)
-        if stripped_string_compare(output_2, expected):
-            return True
-
-    tmp_result = False
-    # ground truth sequences are expressed as lists not tuples
-    if isinstance(expected, tuple):
-        expected = list(expected)
-
-    try:
-        tmp_result = stdout == [expected]
-        if isinstance(expected, list):
-            tmp_result = tmp_result or (stdout == expected)
-            if isinstance(stdout[0], str):
-                tmp_result = tmp_result or ([e.strip() for e in stdout] == expected)
-    except Exception as e:
-        if debug:
-            print(f"Failed check1 exception = {e}")
-        pass
-    if tmp_result:
-        return True
-
-    # try one more time without \n
-    if isinstance(expected, list):
-        for tmp_index, i in enumerate(expected):
-            expected[tmp_index] = i.split("\n")
-            expected[tmp_index] = [x.strip() for x in expected[tmp_index] if x]
-    else:
-        expected = expected.split("\n")
-        expected = list(filter(len, expected))
-        expected = [x.strip() for x in expected]
-
-    try:
-        tmp_result = stdout == [expected]
-        if isinstance(expected, list):
-            tmp_result = tmp_result or (stdout == expected)
-    except Exception as e:
-        if debug:
-            print(f"Failed check2 exception = {e}")
-        pass
-    if tmp_result:
-        return True
-
-    # try by converting the output into a split up list too
-    if isinstance(stdout, list):
-        stdout = list(filter(len, stdout))
-    try:
-        tmp_result = stdout == [expected]
-        if isinstance(expected, list):
-            tmp_result = tmp_result or (stdout == expected)
-    except Exception as e:
-        if debug:
-            print(f"Failed check3 exception = {e}")
-        pass
-    if tmp_result:
-        return True
-
-    try:
-        output_float = [float(e) for e in stdout]
-        gt_float = [float(e) for e in expected]
-        tmp_result = tmp_result or (
-            (len(output_float) == len(gt_float)) and np.allclose(output_float, gt_float)
-        )
+        # Compare as sets of numbers (with rounding) if all elements are numeric
+        if all(all(is_numeric(t) for t in line) for line in tokens1) and all(
+            all(is_numeric(t) for t in line) for line in tokens2
+        ):
+            set1_numeric = {frozenset(round(float(t), 3) for t in line) for line in tokens1 if line}
+            set2_numeric = {frozenset(round(float(t), 3) for t in line) for line in tokens2 if line}
+            return set1_numeric == set2_numeric
     except Exception:
         pass
-    try:
-        if isinstance(stdout[0], list):
-            output_float = [float(e) for e in stdout[0]]
-            gt_float = [float(e) for e in expected[0]]
-            tmp_result = tmp_result or (
-                (len(output_float) == len(gt_float)) and np.allclose(output_float, gt_float)
-            )
-    except Exception:
-        pass
-    if tmp_result:
-        return True
-
-    if isinstance(expected, list):
-        for tmp_index, i in enumerate(expected):
-            expected[tmp_index] = set(i.split())
-    else:
-        expected = set(expected.split())
-
-    try:
-        tmp_result = stdout == expected
-    except Exception as e:
-        if debug:
-            print(f"Failed check4 exception = {e}")
-    if tmp_result:
-        return True
-
-    # try by converting the output into a split up list too
-    if isinstance(stdout, list):
-        for tmp_index, i in enumerate(stdout):
-            stdout[tmp_index] = i.split()
-        stdout = list(filter(len, stdout))
-        for tmp_index, i in enumerate(stdout):
-            stdout[tmp_index] = set(i)
-    else:
-        stdout = stdout.split()
-        stdout = list(filter(len, stdout))
-        stdout = set(stdout)
-    try:
-        tmp_result = {frozenset(s) for s in stdout} == {frozenset(s) for s in expected}
-    except Exception as e:
-        if debug:
-            print(f"Failed check5 exception = {e}")
-
-    # if they are all numbers, round so that similar numbers are treated as identical
-    try:
-        tmp_result = tmp_result or (
-            {frozenset(round(float(t), 3) for t in s) for s in stdout}
-            == {frozenset(round(float(t), 3) for t in s) for s in expected}
-        )
-    except Exception as e:
-        if debug:
-            print(f"Failed check6 exception = {e}")
-
-    if tmp_result:
-        return True
 
     return False
+
+
+@singledispatch
+def normalize_output(output: Any) -> str:
+    r"""Convert any output to a normalized string representation."""
+    return normalize_string(str(output))
+
+
+@normalize_output.register
+def _(output: list) -> str | list[list[str]]:
+    r"""Handle list outputs specially, returning either a normalized string or tokenized list."""
+    # Try as a single joined string
+    joined = "\n".join(str(item) for item in output)
+
+    # Also prepare a tokenized version for alternative comparison methods
+    tokenized = []
+    for item in output:
+        if isinstance(item, str):
+            tokenized.append(item.split())
+        else:
+            try:
+                tokenized.append(str(item).split())
+            except Exception:
+                pass
+
+    return joined, tokenized
+
+
+def check_equal(stdout: Any, expected: Any, debug: bool = False) -> bool:
+    r"""Comprehensively check if stdout matches the expected output.
+
+    This function tries multiple approaches to determine equality:
+    1. Direct string comparison after normalization
+    2. Comparison as lists of lines
+    3. Comparison as tokenized lines
+    4. Comparison as sets
+    5. Comparison as numeric values
+
+    Args:
+        stdout: The actual output (string, list, or other)
+        expected: The expected output (string, list, or other)
+        debug: If True, print debug information
+
+    Returns:
+        True if outputs match, False otherwise
+    """
+    try:
+        # Convert tuples to lists for consistency
+        if isinstance(expected, tuple):
+            expected = list(expected)
+        if isinstance(stdout, tuple):
+            stdout = list(stdout)
+
+        if isinstance(stdout, list) and isinstance(expected, list):
+            if len(stdout) != len(expected):
+                return False
+            for s, e in zip(stdout, expected, strict=False):
+                if not check_equal(s, e):
+                    return False
+            return True
+
+        # Special case: direct equality
+        if stdout == expected:
+            return True
+
+        # Normalize both outputs to strings
+        stdout_norm = normalize_output(stdout)
+        expected_norm = normalize_output(expected)
+
+        # Handle the list case where we get both string and tokenized version
+        stdout_tokenized = None
+        if isinstance(stdout_norm, tuple):
+            stdout_norm, stdout_tokenized = stdout_norm
+
+        expected_tokenized = None
+        if isinstance(expected_norm, tuple):
+            expected_norm, expected_tokenized = expected_norm
+
+        # Try direct string comparison after normalization
+        if normalize_string(stdout_norm) == normalize_string(expected_norm):
+            return True
+
+        # Tokenize the strings for more complex comparisons
+        if stdout_tokenized is None:
+            stdout_tokenized = tokenize_string(stdout_norm)
+
+        if expected_tokenized is None:
+            expected_tokenized = tokenize_string(expected_norm)
+
+        # Compare tokenized representations
+        if compare_tokenized(stdout_tokenized, expected_tokenized):
+            return True
+
+        # Try comparing as sets
+        if compare_as_sets(stdout_tokenized, expected_tokenized):
+            return True
+
+        # Try numeric comparison for lists of numbers
+        try:
+            if (
+                isinstance(stdout, list)
+                and isinstance(expected, list)
+                and all(is_numeric(str(x)) for x in stdout)
+                and all(is_numeric(str(x)) for x in expected)
+            ):
+                stdout_float = [float(x) for x in stdout]
+                expected_float = [float(x) for x in expected]
+
+                if len(stdout_float) == len(expected_float) and np.allclose(
+                    stdout_float, expected_float
+                ):
+                    return True
+        except Exception as e:
+            if debug:
+                print(f"Numeric comparison failed: {e}")
+
+        return False
+
+    except Exception as e:
+        if debug:
+            print(f"Equality check failed with error: {e}")
+        return False

@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.models.schemas import JudgeStatus, TestCaseResult
 from app.services.stdout import check_equal
 from app.services.utils import monitor_process_memory
+from app.utils.logger import logger
 
 
 async def judge_leetcode(
@@ -71,6 +72,9 @@ async def judge_leetcode(
     except Exception as e:
         stop_event.set()
         memory_usage = await memory_task
+        import traceback
+
+        logger.error(traceback.format_exc())
         return TestCaseResult(
             status=JudgeStatus.RUNTIME_ERROR,
             execution_time=0,

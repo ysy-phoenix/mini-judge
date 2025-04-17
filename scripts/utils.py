@@ -7,7 +7,9 @@ import re
 import time
 import warnings
 from collections import Counter
+from dataclasses import dataclass, field
 from statistics import mean, median
+from typing import Any
 
 import aiohttp
 from rich import box
@@ -44,6 +46,20 @@ BLOCK_LIBS = [
 ]
 
 warnings.filterwarnings("ignore", category=SyntaxWarning)
+
+
+@dataclass
+class Submission:
+    """Represents a code submission to be evaluated."""
+
+    code: str
+    language: str = "python"
+    mode: str = "acm"
+    test_cases: list[dict[str, Any]] = field(default_factory=list)
+    time_limit: float = DEFAULT_TIME_LIMIT
+    memory_limit: int = DEFAULT_MEMORY_LIMIT
+    entry_point: str | None = None
+    security_check: bool = False
 
 
 def check_code_with_ast(code):
@@ -91,7 +107,7 @@ def extract_code(code: str) -> list[str]:
         code_blocks = CODE_PATTERN.findall(code)
         return "\n".join(code_blocks).strip()
     else:
-        return None
+        return code.strip()
 
 
 async def judge(id: str, submission: dict) -> dict:
@@ -133,6 +149,8 @@ def dump_failed_result(results: dict, submissions: dict, file_path: str):
             if result.get("status") == "accepted":
                 continue
             submission = submissions[id]
+            if isinstance(submission, Submission):
+                submission = submission.__dict__
             f.write(f"Submission for {id}:\n")
             f.write(f"{submission['code']}\n")
             f.write(f"time_limit: {submission['time_limit']}\n")

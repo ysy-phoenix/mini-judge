@@ -1,7 +1,6 @@
 import asyncio
 import time
 
-from app.core.config import settings
 from app.models.schemas import (
     JudgeMode,
     JudgeResult,
@@ -27,7 +26,7 @@ from app.utils.security import (
 
 async def process_judge_task(submission: Submission) -> JudgeResult:
     r"""Process a judging task directly, without fetching data from Redis"""
-    if settings.SECURITY_CHECK and not is_code_safe(submission.code, submission.language):
+    if submission.security_check and not is_code_safe(submission.code, submission.language):
         logger.error(
             f"Code contains potentially unsafe operations: [red]{submission.task_id}[/red]"
         )
@@ -98,8 +97,10 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                     passed_cases += 1
 
             # Update stats
-            max_execution_time = max(max_execution_time, result.execution_time)
-            max_memory_usage = max(max_memory_usage, result.memory_usage)
+            if result.execution_time is not None:
+                max_execution_time = max(max_execution_time, result.execution_time)
+            if result.memory_usage is not None:
+                max_memory_usage = max(max_memory_usage, result.memory_usage)
 
             # Update overall status (prioritize error states)
             if result.status != JudgeStatus.ACCEPTED:
