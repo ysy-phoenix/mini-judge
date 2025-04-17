@@ -83,6 +83,17 @@ def extract_memory_limit(memory_limit: str | None) -> int:
     return DEFAULT_MEMORY_LIMIT
 
 
+CODE_PATTERN = re.compile(r"```(?:\w+)?\n(.*?)\n```", re.DOTALL)
+
+
+def extract_code(code: str) -> list[str]:
+    if "```python" in code:
+        code_blocks = CODE_PATTERN.findall(code)
+        return "\n".join(code_blocks).strip()
+    else:
+        return None
+
+
 async def judge(id: str, submission: dict) -> dict:
     start_time = time.time()
     async with aiohttp.ClientSession() as session:
@@ -123,7 +134,7 @@ def dump_failed_result(results: dict, submissions: dict, file_path: str):
                 continue
             submission = submissions[id]
             f.write(f"Submission for {id}:\n")
-            f.write(submission["code"])
+            f.write(f"{submission['code']}\n")
             f.write(f"time_limit: {submission['time_limit']}\n")
             f.write(f"memory_limit: {submission['memory_limit']}\n")
             f.write(f"Result for {id}:\n")

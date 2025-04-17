@@ -1,5 +1,4 @@
 import asyncio
-import math
 import time
 from collections.abc import Callable
 from typing import Any
@@ -8,15 +7,8 @@ import psutil
 
 from app.core.config import settings
 from app.models.schemas import JudgeStatus, TestCaseResult
+from app.services.stdout import check_equal
 from app.services.utils import monitor_process_memory
-
-
-def _deep_eq(a: Any, b: Any) -> bool:
-    if isinstance(a, float) or isinstance(b, float):
-        return math.isclose(a, b, rel_tol=1e-5, abs_tol=1e-5)
-    if isinstance(a, (list | tuple)):
-        return len(a) == len(b) and all(_deep_eq(x, y) for x, y in zip(a, b, strict=False))
-    return a == b
 
 
 async def judge_leetcode(
@@ -52,7 +44,7 @@ async def judge_leetcode(
             )
 
         # Check result correctness
-        if not _deep_eq(result, out):
+        if not check_equal(result, out):
             error_message = f"Expected:\n{str(out)[:100]}\nActual:\n{str(result)[:100]}"
             return TestCaseResult(
                 status=JudgeStatus.WRONG_ANSWER,

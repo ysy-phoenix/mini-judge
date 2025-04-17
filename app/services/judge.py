@@ -11,10 +11,10 @@ from app.models.schemas import (
 )
 from app.services.compiler import compile_code
 from app.services.executor import execute_code
+from app.services.stdout import check_equal
 from app.services.utils import (
     MAX_TEST_CASE_RESULTS,
     STATUS_PRIORITY,
-    normalize_output,
     truncate_output,
 )
 from app.utils.logger import logger
@@ -85,14 +85,12 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
             # Compare the output with expected output
             if result.status == JudgeStatus.ACCEPTED:
                 if submission.mode == JudgeMode.ACM:
-                    normalized_output = normalize_output(result.actual_output)
-                    normalized_expected = normalize_output(test_case.expected)
                     result.error_message = (
-                        f"Expected:\n{normalized_expected[:100]}\n"
-                        f"Actual:\n{normalized_output[:100]}"
+                        f"Expected:\n{test_case.expected[:100]}\n"
+                        f"Actual:\n{result.actual_output[:100]}"
                     )
 
-                    if normalized_output != normalized_expected:
+                    if not check_equal(result.actual_output, test_case.expected):
                         result.status = JudgeStatus.WRONG_ANSWER
                     else:
                         passed_cases += 1

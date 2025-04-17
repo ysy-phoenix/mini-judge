@@ -37,6 +37,39 @@ print(add(a, b))
 
 
 @pytest.mark.asyncio
+async def test_function_accepted(async_client, api_base_url):
+    r"""Test Execution mode with correct code - should pass all test cases."""
+    test_code = """
+def is_anagram(test, original):
+    return sorted(original.lower()) == sorted(test.lower())
+"""
+
+    submission = {
+        "code": test_code,
+        "language": Language.PYTHON.value,
+        "mode": JudgeMode.LEETCODE.value,
+        "test_cases": [
+            {"input": ["Buckethead", "DeathCubeK"], "expected": True},
+            {"input": ["foefet", "toffee"], "expected": True},
+            {"input": ["dumble", "bumble"], "expected": False},
+            {"input": ["ound", "round"], "expected": False},
+            {"input": ["apple", "pale"], "expected": False},
+            {"input": ["Twoo", "WooT"], "expected": True},
+        ],
+        "time_limit": 1,
+        "memory_limit": 256,
+        "entry_point": "is_anagram",
+    }
+
+    response = await async_client.post(f"{api_base_url}/api/v1/judge", json=submission)
+
+    assert response.status_code == 200
+    data = response.json()
+    print(data)
+    assert data["status"] == JudgeStatus.ACCEPTED
+
+
+@pytest.mark.asyncio
 async def test_acm_mode_accepted(async_client, api_base_url):
     r"""Test ACM mode with correct code - should pass all test cases."""
     test_code = """

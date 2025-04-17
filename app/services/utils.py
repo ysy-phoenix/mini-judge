@@ -20,19 +20,6 @@ STATUS_PRIORITY = {
 MAX_TEST_CASE_RESULTS = 3
 
 
-def normalize_output(output: str) -> str:
-    r"""Normalize output for comparison.
-    - Trim leading/trailing whitespace
-    - Normalize line endings
-    - Remove empty lines
-    """
-    # First remove trailing newlines explicitly
-    while output.endswith("\n"):
-        output = output[:-1]
-    lines = output.strip().replace("\r\n", "\n").replace("\r", "\n").split("\n")
-    return "\n".join(line.strip() for line in lines if line.strip())
-
-
 def truncate_output(output: str, max_length: int = 256) -> str:
     if output is None:
         return None
