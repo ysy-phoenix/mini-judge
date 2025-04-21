@@ -13,6 +13,7 @@ datasets
 huggingface_hub
 hf_transfer
 ratelimit
+typer
 ruff
 pre-commit
 

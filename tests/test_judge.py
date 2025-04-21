@@ -65,7 +65,6 @@ def is_anagram(test, original):
 
     assert response.status_code == 200
     data = response.json()
-    print(data)
     assert data["status"] == JudgeStatus.ACCEPTED
 
 

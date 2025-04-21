@@ -10,6 +10,7 @@ import argparse
 import asyncio
 import json
 import os
+import random
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -66,10 +67,17 @@ def get_solutions(solutions: list[str]) -> list[str]:
     return valid_solutions[:MAX_SOLUTIONS]
 
 
-def get_tests(tests: list[dict] | dict) -> list[dict]:
-    r"""Sort tests by input length and limit to MAX_TEST_CASES."""
-    sorted_tests = sorted(tests, key=lambda test: len(str(test["input"])), reverse=True)
-    return sorted_tests[:MAX_TEST_CASES]
+def get_tests(tests: list[dict], k: int = 10, m: int = 20, n: int = 30) -> list[dict]:
+    r"""Select k shortest, m longest, and n random tests from remaining."""
+    if len(tests) <= k + m + n:
+        return tests
+    tests = sorted(tests, key=lambda t: len(str(t["input"])))
+    shortest = tests[:k]
+    longest = tests[-m:] if m else []
+    remaining = tests[k:-m] if m else tests[k:]
+    return (
+        shortest + longest + (random.sample(remaining, min(n, len(remaining))) if remaining else [])
+    )
 
 
 def prepare_taco_tests(tests: dict) -> tuple[str, list[dict], str | None]:
