@@ -19,7 +19,7 @@ class RedisQueue(Enum):
     PROCESSED = "processed"
     SUBMITTED = "submitted"
     FETCHED = "fetched"
-    RESTART = "restart_status"
+    RESTART = "restart"
 
 
 async def get_redis():

@@ -1,5 +1,6 @@
 import asyncio
 import signal
+import time
 from multiprocessing import Process
 
 from app.core.config import settings
@@ -21,7 +22,9 @@ class JudgeWorker(Process):
         task_key = RedisManager.queue(RedisQueue.TASKS, submission.task_id)
 
         try:
-            await RedisManager.hset(task_key, {"status": JudgeStatus.RUNNING})
+            await RedisManager.hset(
+                task_key, {"status": JudgeStatus.RUNNING, "running_at": time.time()}
+            )
             await RedisManager.expire(task_key, settings.RESULT_EXPIRY_TIME)
             result = await process_judge_task(submission)
             await RedisManager.push(

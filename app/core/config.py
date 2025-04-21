@@ -28,11 +28,9 @@ class Settings(BaseSettings):
 
     # Worker settings
     MAX_WORKERS: int = multiprocessing.cpu_count()
-    MAX_LATENCY: int = 180
-    MAX_TASK_EXECUTION_TIME: int = 150
+    MAX_LATENCY: int = 75
+    MAX_TASK_EXECUTION_TIME: int = 60
     RESULT_EXPIRY_TIME: int = 3600
-    IDLE_RESTART_THRESHOLD: float = 180.0
-    RESTART_THRESHOLD: int = 900.0
 
     # Manager settings
     MONITOR_INTERVAL: int = 20

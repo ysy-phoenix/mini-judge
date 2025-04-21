@@ -90,15 +90,6 @@ class WorkerMonitor(ThreadWorker):
     def __init__(self, workers: list, interval: float = 10.0):
         super().__init__(interval=interval, name="worker-monitor")
         self.workers = workers
-        self.last_activity_time = time.time()
-        self.last_restart_time = time.time()
-        self.idle_restart_threshold = settings.IDLE_RESTART_THRESHOLD
-        self.restart_threshold = settings.RESTART_THRESHOLD
-        self.system_manager = None
-
-    def set_system_manager(self, manager):
-        r"""Set reference to the system manager for restart capability."""
-        self.system_manager = manager
 
     def execute(self):
         status = self.check_workers_status()
@@ -115,28 +106,6 @@ class WorkerMonitor(ThreadWorker):
                 status["failed"] += 1
             else:
                 self.check_worker_activity(worker, status)
-
-        # Check if all workers are idle
-        current_time = time.time()
-        if status["busy"] > 0:
-            self.last_activity_time = current_time
-            return
-        idle_duration = current_time - self.last_activity_time
-        restart_duration = current_time - self.last_restart_time
-        if (
-            idle_duration > self.idle_restart_threshold
-            and self.system_manager
-            and restart_duration > self.restart_threshold
-        ):
-            logger.warning(
-                f"All workers idle for {idle_duration:.1f} seconds, "
-                f"restarting workers to prevent memory leaks"
-            )
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.system_manager.restart_workers())
-            self.last_activity_time = current_time
-            self.last_restart_time = current_time
 
         return status
 
@@ -214,7 +183,11 @@ class TaskRecovery(AsyncThreadWorker):
         for key in task_keys:
             task_info = await RedisManager.get_hash_fields(key, ["status", "submitted_at", "data"])
             status = task_info.get("status")
-            if status == JudgeStatus.PENDING and length == 0:
+            if (status == JudgeStatus.PENDING and length == 0) or (
+                status == JudgeStatus.RUNNING
+                and time.time() - float(task_info.get("running_at", 0))
+                > settings.MAX_TASK_EXECUTION_TIME
+            ):
                 logger.warning(f"Detected lost pending task: {key.split(':')[-1]}!")
                 recovered += 1
                 await self.recover_task(key, task_info.get("data"))
