@@ -1,6 +1,5 @@
 import asyncio
 import signal
-import time
 from multiprocessing import Process
 
 from app.core.config import settings
@@ -67,13 +66,11 @@ class JudgeWorker(Process):
             pass
 
     def run(self):
-        r"""Main process entry point with simplified signal handling."""
+        r"""Main process entry point with minimal shutdown handling."""
+        self.loop = None
 
         def handle_signal(signum, frame):
             self.running = False
-            time.sleep(1)
-            if self.loop:
-                self.loop.call_soon_threadsafe(self.loop.stop)
 
         signal.signal(signal.SIGTERM, handle_signal)
         signal.signal(signal.SIGINT, handle_signal)
@@ -83,6 +80,20 @@ class JudgeWorker(Process):
             asyncio.set_event_loop(self.loop)
             self.loop.run_until_complete(self.work())
         except Exception as e:
-            logger.error(f"Error in worker {self.worker_id}: {str(e)}")
+            if not self.running or "Event loop stopped" in str(e):
+                pass
+            else:
+                logger.error(f"Error in worker {self.worker_id}: {str(e)}")
         finally:
+            if self.loop and self.loop.is_running():
+                self.loop.stop()
             self.running = False
+
+    async def shutdown_gracefully(self):
+        r"""Perform graceful shutdown of async operations."""
+        logger.debug(f"Worker {self.worker_id} shutting down gracefully")
+
+        await asyncio.sleep(0.5)
+
+        if self.loop:
+            self.loop.stop()

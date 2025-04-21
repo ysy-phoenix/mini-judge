@@ -90,6 +90,15 @@ class WorkerMonitor(ThreadWorker):
     def __init__(self, workers: list, interval: float = 10.0):
         super().__init__(interval=interval, name="worker-monitor")
         self.workers = workers
+        self.last_activity_time = time.time()
+        self.last_restart_time = time.time()
+        self.idle_restart_threshold = settings.IDLE_RESTART_THRESHOLD
+        self.restart_threshold = settings.RESTART_THRESHOLD
+        self.system_manager = None
+
+    def set_system_manager(self, manager):
+        r"""Set reference to the system manager for restart capability."""
+        self.system_manager = manager
 
     def execute(self):
         status = self.check_workers_status()
@@ -106,6 +115,28 @@ class WorkerMonitor(ThreadWorker):
                 status["failed"] += 1
             else:
                 self.check_worker_activity(worker, status)
+
+        # Check if all workers are idle
+        current_time = time.time()
+        if status["busy"] > 0:
+            self.last_activity_time = current_time
+            return
+        idle_duration = current_time - self.last_activity_time
+        restart_duration = current_time - self.last_restart_time
+        if (
+            idle_duration > self.idle_restart_threshold
+            and self.system_manager
+            and restart_duration > self.restart_threshold
+        ):
+            logger.warning(
+                f"All workers idle for {idle_duration:.1f} seconds, "
+                f"restarting workers to prevent memory leaks"
+            )
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.system_manager.restart_workers())
+            self.last_activity_time = current_time
+            self.last_restart_time = current_time
 
         return status
 
@@ -168,7 +199,7 @@ class WorkerMonitor(ThreadWorker):
 
 
 class TaskRecovery(AsyncThreadWorker):
-    """Recovers and requeues stuck tasks."""
+    r"""Recovers and requeues stuck tasks."""
 
     def __init__(self, interval: float = 0.2):
         super().__init__(interval=interval, name="task-recovery")
@@ -208,7 +239,7 @@ class TaskRecovery(AsyncThreadWorker):
 
 
 class RedisCleanup(AsyncThreadWorker):
-    """Cleans up expired keys in Redis."""
+    r"""Cleans up expired keys in Redis."""
 
     def __init__(self, interval: float = 300.0):
         super().__init__(interval=interval, name="redis-cleanup")

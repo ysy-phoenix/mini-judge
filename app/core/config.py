@@ -31,9 +31,11 @@ class Settings(BaseSettings):
     MAX_LATENCY: int = 180
     MAX_TASK_EXECUTION_TIME: int = 150
     RESULT_EXPIRY_TIME: int = 3600
+    IDLE_RESTART_THRESHOLD: float = 180.0
+    RESTART_THRESHOLD: int = 900.0
 
     # Manager settings
-    MONITOR_INTERVAL: int = 10
+    MONITOR_INTERVAL: int = 20
     RECOVER_INTERVAL: float = 0.2
     CLEANUP_INTERVAL: int = 900
 
