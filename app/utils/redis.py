@@ -19,6 +19,7 @@ class RedisQueue(Enum):
     PROCESSED = "processed"
     SUBMITTED = "submitted"
     FETCHED = "fetched"
+    RESTART = "restart"
 
 
 async def get_redis():
@@ -106,6 +107,12 @@ class RedisManager:
         r"""Get data from a queue."""
         redis = await get_redis()
         return await redis.get(queue.value)
+
+    @staticmethod
+    async def set(queue: RedisQueue, value: str) -> None:
+        r"""Set data in a queue."""
+        redis = await get_redis()
+        await redis.set(queue.value, value)
 
     @staticmethod
     async def length(queue: RedisQueue) -> int:

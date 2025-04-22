@@ -168,7 +168,7 @@ class WorkerMonitor(ThreadWorker):
 
 
 class TaskRecovery(AsyncThreadWorker):
-    """Recovers and requeues stuck tasks."""
+    r"""Recovers and requeues stuck tasks."""
 
     def __init__(self, interval: float = 0.2):
         super().__init__(interval=interval, name="task-recovery")
@@ -183,7 +183,11 @@ class TaskRecovery(AsyncThreadWorker):
         for key in task_keys:
             task_info = await RedisManager.get_hash_fields(key, ["status", "submitted_at", "data"])
             status = task_info.get("status")
-            if status == JudgeStatus.PENDING and length == 0:
+            if (status == JudgeStatus.PENDING and length == 0) or (
+                status == JudgeStatus.RUNNING
+                and time.time() - float(task_info.get("running_at", 0))
+                > settings.MAX_TASK_EXECUTION_TIME
+            ):
                 logger.warning(f"Detected lost pending task: {key.split(':')[-1]}!")
                 recovered += 1
                 await self.recover_task(key, task_info.get("data"))
@@ -208,7 +212,7 @@ class TaskRecovery(AsyncThreadWorker):
 
 
 class RedisCleanup(AsyncThreadWorker):
-    """Cleans up expired keys in Redis."""
+    r"""Cleans up expired keys in Redis."""
 
     def __init__(self, interval: float = 300.0):
         super().__init__(interval=interval, name="redis-cleanup")

@@ -11,6 +11,23 @@ async def health_check():
     return {"status": "healthy"}
 
 
+@router.post("/restart")
+async def restart():
+    r"""Restart the worker manager."""
+    await RedisManager.set(RedisQueue.RESTART, str(True))
+    return {"status": "restarting"}
+
+
+@router.get("/restart")
+async def restart_status():
+    r"""Get the restart status."""
+    restart_status = await RedisManager.get(RedisQueue.RESTART)
+    restart_status = (
+        False if restart_status is None or restart_status.decode("utf-8") != "True" else True
+    )
+    return {"restart": restart_status}
+
+
 @router.get("/redis")
 async def redis_health_check():
     r"""Check Redis connection health."""

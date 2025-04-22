@@ -22,19 +22,18 @@ class Settings(BaseSettings):
 
     # Security settings
     ALLOWED_HOSTS: list[str] = ["*"]
-    SECURITY_CHECK: bool = True
 
     # Code execution
     CODE_EXECUTION_DIR: str = "/tmp/mini_judge"
 
     # Worker settings
     MAX_WORKERS: int = multiprocessing.cpu_count()
-    MAX_LATENCY: int = 180
-    MAX_TASK_EXECUTION_TIME: int = 150
+    MAX_LATENCY: int = 75
+    MAX_TASK_EXECUTION_TIME: int = 60
     RESULT_EXPIRY_TIME: int = 3600
 
     # Manager settings
-    MONITOR_INTERVAL: int = 10
+    MONITOR_INTERVAL: int = 20
     RECOVER_INTERVAL: float = 0.2
     CLEANUP_INTERVAL: int = 900
 

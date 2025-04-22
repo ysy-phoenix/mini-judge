@@ -48,6 +48,7 @@ class Submission(BaseModel):
     memory_limit: int | None = 256  # MB
     task_id: str | None = Field(default_factory=generate_uuid)
     entry_point: str | None = None
+    security_check: bool = True
 
 
 class TestCaseResult(BaseModel):

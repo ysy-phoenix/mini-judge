@@ -22,9 +22,9 @@ class WorkerManager:
         logger.info(f"All {self.max_workers} workers started")
 
         # Initialize service components
-        self.worker_monitor = WorkerMonitor(self.workers)
-        self.task_recovery = TaskRecovery()
-        self.redis_cleanup = RedisCleanup()
+        self.worker_monitor = WorkerMonitor(self.workers, interval=settings.MONITOR_INTERVAL)
+        self.task_recovery = TaskRecovery(interval=settings.RECOVER_INTERVAL)
+        self.redis_cleanup = RedisCleanup(interval=settings.CLEANUP_INTERVAL)
 
         # Start all services
         self.worker_monitor.start()

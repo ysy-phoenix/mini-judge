@@ -175,3 +175,4 @@ cython_debug/
 
 # Results
 results/
+output.txt

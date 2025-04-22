@@ -1,87 +1,90 @@
 import asyncio
-import math
 import time
 from collections.abc import Callable
 from typing import Any
 
 import psutil
 
-from app.core.config import settings
 from app.models.schemas import JudgeStatus, TestCaseResult
-from app.services.utils import monitor_process_memory
-
-
-def _deep_eq(a: Any, b: Any) -> bool:
-    if isinstance(a, float) or isinstance(b, float):
-        return math.isclose(a, b, rel_tol=1e-5, abs_tol=1e-5)
-    if isinstance(a, (list | tuple)):
-        return len(a) == len(b) and all(_deep_eq(x, y) for x, y in zip(a, b, strict=False))
-    return a == b
+from app.services.stdout import check_equal
+from app.services.utils import managed_process_execution
+from app.utils.logger import logger
 
 
 async def judge_leetcode(
     fn: Callable, inp: list[Any], out: Any, time_limit_sec: int, memory_limit_bytes: int
 ) -> TestCaseResult:
-    r"""Execute LeetCode style test cases with resource constraints."""
-    # Create event for memory monitoring
-    stop_event = asyncio.Event()
+    r"""Execute LeetCode style test cases with resource constraints and improved robustness."""
+    start_time = time.time()
+    memory_usage = 0
 
-    try:
-        # Start memory monitoring in background
-        process = psutil.Process()
-        memory_task = asyncio.create_task(monitor_process_memory(process.pid, stop_event))
+    # Use the managed process execution context for better resource monitoring
+    async with managed_process_execution(time_limit_sec, memory_limit_bytes) as ctx:
+        try:
+            # Get current process and set up monitoring
+            process = psutil.Process()
+            ctx["register_process"](process.pid)
+            ctx["start_monitoring"](process.pid)
 
-        # Execute function with timeout
-        start_time = time.time()
-        result = await asyncio.wait_for(
-            asyncio.get_event_loop().run_in_executor(None, fn, *inp), timeout=time_limit_sec + 1
-        )
-        execution_time = time.time() - start_time
+            # Execute function with timeout
+            result = await asyncio.wait_for(
+                asyncio.get_event_loop().run_in_executor(None, fn, *inp), timeout=time_limit_sec
+            )
 
-        # Stop memory monitoring
-        stop_event.set()
-        memory_usage = await memory_task
+            execution_time = time.time() - start_time
 
-        # Check memory limit
-        if memory_usage > memory_limit_bytes:
+            # Try to get memory usage from monitoring tasks
+            stop_event = ctx.get("stop_event")
+            if stop_event and not stop_event.is_set():
+                # Give a moment for memory monitoring to catch up
+                await asyncio.sleep(0.1)
+
+            # Check result correctness
+            if not check_equal(result, out):
+                error_message = f"Expected:\n{str(out)[:100]}\nActual:\n{str(result)[:100]}"
+                return TestCaseResult(
+                    status=JudgeStatus.WRONG_ANSWER,
+                    execution_time=execution_time,
+                    memory_usage=memory_usage,
+                    actual_output=str(result),
+                    expected_output=str(out),
+                    error_message=error_message,
+                )
+
+            return TestCaseResult(
+                status=JudgeStatus.ACCEPTED,
+                execution_time=execution_time,
+                memory_usage=memory_usage,
+            )
+
+        except asyncio.TimeoutError:
+            # Function execution timed out
+            return TestCaseResult(
+                status=JudgeStatus.TIME_LIMIT_EXCEEDED,
+                execution_time=time_limit_sec,
+                memory_usage=memory_usage,
+                error_message="Time Limit Exceeded",
+            )
+
+        except MemoryError:
+            # Explicit memory error caught
             return TestCaseResult(
                 status=JudgeStatus.MEMORY_LIMIT_EXCEEDED,
-                execution_time=execution_time,
+                execution_time=time.time() - start_time,
                 memory_usage=memory_usage,
-                error_message=f"Memory limit exceeded: {memory_usage}MB used",
+                error_message="Memory Limit Exceeded",
             )
 
-        # Check result correctness
-        if not _deep_eq(result, out):
-            error_message = f"Expected:\n{str(out)[:100]}\nActual:\n{str(result)[:100]}"
+        except Exception as e:
+            # Any other exception during function execution
+            import traceback
+
+            error_trace = traceback.format_exc()
+            logger.error(error_trace)
+
             return TestCaseResult(
-                status=JudgeStatus.WRONG_ANSWER,
-                execution_time=execution_time,
+                status=JudgeStatus.RUNTIME_ERROR,
+                execution_time=time.time() - start_time,
                 memory_usage=memory_usage,
-                actual_output=str(result),
-                expected_output=str(out),
-                error_message=error_message,
+                error_message=f"Runtime Error: {str(e)}\n{error_trace[:500]}",
             )
-
-        return TestCaseResult(
-            status=JudgeStatus.ACCEPTED, execution_time=execution_time, memory_usage=memory_usage
-        )
-
-    except asyncio.TimeoutError:
-        stop_event.set()
-        memory_usage = await memory_task
-        return TestCaseResult(
-            status=JudgeStatus.TIME_LIMIT_EXCEEDED,
-            execution_time=settings.MAX_EXECUTION_TIME,
-            memory_usage=memory_usage if memory_usage else 0,
-            error_message="Time Limit Exceeded",
-        )
-    except Exception as e:
-        stop_event.set()
-        memory_usage = await memory_task
-        return TestCaseResult(
-            status=JudgeStatus.RUNTIME_ERROR,
-            execution_time=0,
-            memory_usage=memory_usage if memory_usage else 0,
-            error_message=f"Runtime Error: {str(e)}",
-        )

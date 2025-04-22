@@ -67,6 +67,9 @@ curl http://localhost:8000/api/v1/health
 
 # check detail status
 curl http://localhost:8000/api/v1/health/detail
+
+# check restart status
+curl http://localhost:8000/api/v1/health/restart
 ```
 
 ### Useful commands
