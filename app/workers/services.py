@@ -183,12 +183,18 @@ class TaskRecovery(AsyncThreadWorker):
         for key in task_keys:
             task_info = await RedisManager.get_hash_fields(key, ["status", "submitted_at", "data"])
             status = task_info.get("status")
-            if (status == JudgeStatus.PENDING and length == 0) or (
+            current_time = float(time.time())
+            if (
+                status == JudgeStatus.PENDING
+                and length == 0
+                and current_time - float(task_info.get("submitted_at", float("inf"))) > 5.0
+            ) or (
                 status == JudgeStatus.RUNNING
-                and time.time() - float(task_info.get("running_at", 0))
+                and current_time - float(task_info.get("running_at", float("inf")))
                 > settings.MAX_TASK_EXECUTION_TIME
             ):
-                logger.warning(f"Detected lost pending task: {key.split(':')[-1]}!")
+                key = key.decode("utf-8").split(":")[-1].split("-")[0]
+                logger.warning(f"Detected lost pending task: {key}!")
                 recovered += 1
                 await self.recover_task(key, task_info.get("data"))
 

@@ -157,6 +157,8 @@ async def enforce_memory_limit(
                 await asyncio.sleep(0.05)
             except psutil.NoSuchProcess:
                 break
+    except psutil.NoSuchProcess:
+        pass
     except Exception as e:
         logger.error(f"Memory enforcement error for PID {pid}: {str(e)}")
 

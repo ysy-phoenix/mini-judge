@@ -33,8 +33,8 @@ class Settings(BaseSettings):
     RESULT_EXPIRY_TIME: int = 3600
 
     # Manager settings
-    MONITOR_INTERVAL: int = 20
-    RECOVER_INTERVAL: float = 0.2
+    MONITOR_INTERVAL: int = 10
+    RECOVER_INTERVAL: float = 1.0
     CLEANUP_INTERVAL: int = 900
 
     model_config = {"env_file": ".env"}
