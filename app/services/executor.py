@@ -126,7 +126,7 @@ async def execute_with_limits(
                     error_message=stderr_str,
                 )
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Always explicitly clean up on timeout
                 if process_id:
                     await cleanup_process(process_id)

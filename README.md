@@ -23,24 +23,17 @@ Mini-Judge is a lightweight, high-performance online judge system for evaluating
 
 ## 📦 Installation
 
-option 1: conda
-
 ```bash
-conda create -n judge python=3.11 -y
+# conda
+conda create -n judge python=3.12 -y
 conda activate judge
+pip install -U pip && pip install uv
 
-pip install -r requirements.txt
-pip install -e .
-```
-
-option 2: uv
-
-```bash
-uv venv --python 3.11
+# or uv
+uv venv --python 3.12
 source .venv/bin/activate
 
-uv pip install -r requirements.txt
-uv pip install -e .
+uv pip install -e ".[all]" # other options: [dev], [base]
 ```
 
 > [!Note]
@@ -50,7 +43,7 @@ install redis
 
 ```bash
 sudo apt update && sudo apt install redis-server -y
-redis-server --daemonize yes
+redis-server --port 6379 --daemonize yes
 ```
 
 ## 🚀 Quick Start

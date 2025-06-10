@@ -12,16 +12,54 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "python-multipart",
+    "pytest-asyncio",
+    "httpx",
     "rich",
     "psutil",
     "datasets",
     "huggingface_hub",
     "hf_transfer",
     "ratelimit",
+    "typer",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
 license = {file = "LICENSE"}
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "pre-commit",
+]
+
+base = [
+    "beautifulsoup4",
+    "fake-useragent",
+    "imageio",
+    "keras",
+    "lxml",
+    "matplotlib",
+    "numpy",
+    "opencv-python",
+    "pandas",
+    "pillow",
+    "requests",
+    "rich",
+    "scikit-learn",
+    "sphinx-pyproject",
+    "statsmodels",
+    "sympy",
+    "tweepy",
+    "typing_extensions",
+    "xgboost",
+    "flask",
+    "seaborn",
+    "networkx",
+]
+
+all = ["mini-judge[base,dev]",]
 
 [build-system]
 requires = ["hatchling"]
@@ -32,19 +70,11 @@ packages = ["app"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
-select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "I",    # isort
-    "B",    # flake8-bugbear
-    "N",    # flake8-noqa
-    "C4",   # flake8-comprehensions
-    "UP",   # pyupgrade
-]
+select = ["E", "F", "B", "I", "UP", "N", "C", "W"]
+ignore = ["C901", "N818"]
 
 [tool.ruff.format]
 quote-style = "double"

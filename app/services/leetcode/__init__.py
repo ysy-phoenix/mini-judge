@@ -57,7 +57,7 @@ async def judge_leetcode(
                 memory_usage=memory_usage,
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Function execution timed out
             return TestCaseResult(
                 status=JudgeStatus.TIME_LIMIT_EXCEEDED,
