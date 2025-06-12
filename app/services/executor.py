@@ -122,7 +122,7 @@ async def execute_with_limits(
                     status=status,
                     execution_time=execution_time,
                     memory_usage=memory_usage,
-                    actual_output=stdout_str,
+                    actual=stdout_str,
                     error_message=stderr_str,
                 )
 

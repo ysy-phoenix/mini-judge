@@ -32,8 +32,8 @@ print(add(a, b))
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == JudgeStatus.ACCEPTED
-    assert data["test_case_results"][0]["actual_output"] == "3"
-    assert data["test_case_results"][1]["actual_output"] == "0"
+    assert data["test_case_results"][0]["actual"] == "3"
+    assert data["test_case_results"][1]["actual"] == "0"
 
 
 @pytest.mark.asyncio

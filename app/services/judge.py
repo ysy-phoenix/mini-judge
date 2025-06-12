@@ -14,7 +14,6 @@ from app.services.stdout import check_equal
 from app.services.utils import (
     MAX_TEST_CASE_RESULTS,
     STATUS_PRIORITY,
-    truncate_output,
 )
 from app.utils.logger import logger
 from app.utils.security import (
@@ -84,12 +83,8 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
             # Compare the output with expected output
             if result.status == JudgeStatus.ACCEPTED:
                 if submission.mode == JudgeMode.ACM:
-                    result.error_message = (
-                        f"Expected:\n{test_case.expected[:100]}\n"
-                        f"Actual:\n{result.actual_output[:100]}"
-                    )
-
-                    if not check_equal(result.actual_output, test_case.expected):
+                    if not check_equal(result.actual, test_case.expected):
+                        result.error_message = "Wrong Answer"
                         result.status = JudgeStatus.WRONG_ANSWER
                     else:
                         passed_cases += 1
@@ -112,21 +107,15 @@ async def process_judge_task(submission: Submission) -> JudgeResult:
                 result.status != JudgeStatus.ACCEPTED
                 and len(test_case_results) < MAX_TEST_CASE_RESULTS
             ) or (submission.mode == JudgeMode.EXECUTION):
-                actual_output = (
-                    truncate_output(result.actual_output)
-                    if submission.mode != JudgeMode.EXECUTION
-                    else result.actual_output
-                )
                 test_case_results.append(
                     TestCaseResult(
                         status=result.status,
                         execution_time=result.execution_time,
                         memory_usage=result.memory_usage,
-                        error_message=truncate_output(result.error_message)
-                        if result.error_message
-                        else None,
-                        expected_output=truncate_output(str(test_case.expected)),
-                        actual_output=actual_output,
+                        error_message=result.error_message,
+                        input=str(test_case.input),
+                        expected=str(test_case.expected),
+                        actual=result.actual,
                     )
                 )
 

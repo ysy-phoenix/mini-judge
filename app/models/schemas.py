@@ -56,8 +56,9 @@ class TestCaseResult(BaseModel):
     execution_time: float | None = None  # seconds
     memory_usage: int | None = None  # MB
     error_message: str | None = None
-    expected_output: str | None = None
-    actual_output: str | None = None
+    input: str | None = None
+    expected: str | None = None
+    actual: str | None = None
 
 
 class JudgeResult(BaseModel):

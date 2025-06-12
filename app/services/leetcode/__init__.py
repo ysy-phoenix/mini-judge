@@ -41,14 +41,13 @@ async def judge_leetcode(
 
             # Check result correctness
             if not check_equal(result, out):
-                error_message = f"Expected:\n{str(out)[:100]}\nActual:\n{str(result)[:100]}"
                 return TestCaseResult(
                     status=JudgeStatus.WRONG_ANSWER,
                     execution_time=execution_time,
                     memory_usage=memory_usage,
-                    actual_output=str(result),
-                    expected_output=str(out),
-                    error_message=error_message,
+                    actual=str(result),
+                    expected=str(out),
+                    error_message="Wrong Answer",
                 )
 
             return TestCaseResult(
@@ -86,5 +85,5 @@ async def judge_leetcode(
                 status=JudgeStatus.RUNTIME_ERROR,
                 execution_time=time.time() - start_time,
                 memory_usage=memory_usage,
-                error_message=f"Runtime Error: {str(e)}\n{error_trace[:500]}",
+                error_message=f"Runtime Error: {str(e)}\n{error_trace}",
             )
